@@ -1,0 +1,1775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Figure Creation Agent — conceptual figure builder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgenjs.bundle.min.js"></script>
+<style>
+  :root{
+    --paper:#F7F5F0;
+    --paper-deep:#EFECE3;
+    --rule:#DAD5C7;
+    --ink:#1C1B18;
+    --ink-soft:#5B584E;
+    --ink-faint:#95917F;
+    --line:#B9B4A2;
+    --white:#FFFFFF;
+    --thea:#B23368;
+    --thea-bg:#F7E4EC;
+    --drew:#2E6FA3;
+    --drew-bg:#E1EBF3;
+    --danger:#A3402E;
+    --danger-bg:#F5E4DF;
+    --ok:#3E6B4F;
+    --radius:3px;
+    --font-display:"Iowan Old Style","Palatino Linotype",Palatino,"Source Serif 4",Georgia,serif;
+    --font-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%; margin:0; overflow:hidden;}
+  body{
+    margin:0;
+    background:var(--paper-deep);
+    color:var(--ink);
+    font-family:var(--font-body);
+    font-size:14px;
+    line-height:1.45;
+  }
+  button{font-family:inherit;}
+  textarea{font-family:inherit;}
+  ::selection{background:#CFE0E8;}
+  .hidden{display:none !important;}
+
+  .tbtn{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:6px 11px; background:var(--white); border:1px solid var(--line);
+    border-radius:var(--radius); color:var(--ink); font-size:12px; cursor:pointer; line-height:1;
+  }
+  .tbtn:hover{ border-color:var(--ink-soft); background:#FCFBF8; }
+  .tbtn.primary{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+  .tbtn.primary:hover{ background:#000; }
+  .tbtn.big{ padding:10px 22px; font-size:13.5px; }
+  .tbtn:disabled{ opacity:0.4; cursor:not-allowed; }
+
+  /* ---------- Gate screens (consent / intake) ---------- */
+  .screen{
+    height:100vh; height:100dvh; display:flex; align-items:center; justify-content:center; padding:24px;
+    background:radial-gradient(var(--rule) 1px, transparent 1px) var(--paper-deep);
+    background-size:22px 22px; overflow-y:auto;
+  }
+  .screen-card{
+    background:var(--paper); border:1px solid var(--rule); border-radius:8px;
+    box-shadow:0 18px 50px rgba(28,27,24,0.10); padding:32px 34px; max-width:480px; width:100%;
+  }
+  .screen-card.wide{ max-width:620px; }
+  .screen-kicker{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--ink-faint); margin:0 0 6px;
+  }
+  .screen-title{ font-family:var(--font-display); font-size:26px; font-weight:600; margin:0 0 16px; line-height:1.2; }
+  .consent-body p{ margin:0 0 12px; font-size:13.5px; line-height:1.6; color:var(--ink); }
+  .consent-body ul{ margin:0 0 14px; padding-left:20px; font-size:13.5px; line-height:1.6; }
+  .consent-body li{ margin-bottom:6px; }
+  .consent-body h3{ font-family:var(--font-display); font-size:15.5px; font-weight:600; margin:20px 0 8px; color:var(--ink); }
+  .consent-body h3:first-child{ margin-top:0; }
+  .consent-body a{ color:var(--thea); }
+  .consent-scroll{
+    max-height:44vh; overflow-y:auto; padding-right:12px; margin-bottom:14px;
+    border-bottom:1px solid var(--rule); border-top:1px solid var(--rule);
+  }
+  .consent-check{
+    display:flex; align-items:flex-start; gap:9px; font-size:13px; color:var(--ink);
+    margin:18px 0 6px; cursor:pointer; line-height:1.45;
+  }
+  .consent-check input{ margin-top:3px; flex:none; width:16px; height:16px; }
+  .consent-fineprint{ font-size:11.5px; color:var(--ink-faint); margin:0 0 4px; line-height:1.5; }
+  .screen-actions{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:22px; flex-wrap:wrap; }
+
+  .field-label{ display:block; font-size:13px; font-weight:600; color:var(--ink); margin:20px 0 6px; }
+  .field-label:first-of-type{ margin-top:4px; }
+  .field-hint{ display:block; font-weight:400; font-size:12px; color:var(--ink-faint); margin-top:2px; }
+  .field-input{
+    width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:var(--radius);
+    font-size:13.5px; font-family:var(--font-body); background:var(--white);
+  }
+  .field-input:focus{ outline:none; border-color:var(--ink-soft); }
+  .field-input:disabled{ opacity:0.45; }
+  .field-input.inline{ width:auto; flex:1; margin-left:8px; padding:4px 8px; font-size:12.5px; }
+  .chip-row{ display:flex; gap:8px; }
+  .chip-row .field-input{ flex:1; }
+  .chip-row .tbtn:disabled{ opacity:0.45; }
+  .chip-list{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .chip{
+    display:inline-flex; align-items:center; gap:6px; background:var(--paper-deep);
+    border:1px solid var(--line); border-radius:14px; padding:4px 6px 4px 12px; font-size:12.5px; color:var(--ink);
+  }
+  .chip button{ border:none; background:none; color:var(--ink-faint); cursor:pointer; font-size:14px; line-height:1; padding:2px 4px; border-radius:50%; }
+  .chip button:hover{ color:var(--danger); background:var(--danger-bg); }
+  .radio-group{ display:flex; flex-direction:column; gap:9px; }
+  .radio-group label{ display:flex; align-items:center; gap:9px; font-size:13px; color:var(--ink); cursor:pointer; }
+  .radio-group input[type=radio]{ flex:none; width:15px; height:15px; margin-top:0; }
+
+  .check-inline{ display:flex; align-items:center; gap:6px; margin:7px 0 0; font-size:12px; color:var(--ink-soft); cursor:pointer; }
+  .check-inline input{ width:14px; height:14px; }
+
+  .field-row-mic{ display:flex; gap:8px; align-items:flex-start; }
+  .field-row-mic .field-input{ flex:1; resize:vertical; font-family:var(--font-body); }
+  .field-row-mic .mic-btn{ height:38px; margin-top:0; }
+
+  .persona-say{
+    display:flex; gap:11px; align-items:flex-start; background:var(--white); border:1px solid var(--rule);
+    border-radius:8px; padding:13px 15px; margin-bottom:14px;
+  }
+  .persona-say.thea{ border-left:3px solid var(--thea); }
+  .persona-say.drew{ border-left:3px solid var(--drew); }
+  .persona-say-name{ font-family:var(--font-mono); font-size:10px; letter-spacing:0.06em; text-transform:uppercase; margin:0 0 3px; }
+  .persona-say.thea .persona-say-name{ color:var(--thea); }
+  .persona-say.drew .persona-say-name{ color:var(--drew); }
+  .persona-say-text{ margin:0; font-size:13.5px; line-height:1.55; color:var(--ink); }
+
+  .avatar{ width:28px; height:28px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; margin-top:2px; }
+  .avatar svg{ width:16px; height:16px; }
+  .avatar-thea{ background:var(--thea); }
+  .avatar-drew{ background:var(--drew); }
+  .avatar-lg{ width:34px; height:34px; margin-top:0; }
+  .avatar-lg svg{ width:19px; height:19px; }
+
+  /* ---------- Voice controls ---------- */
+  .voice-toggle{
+    display:flex; align-items:center; gap:6px; padding:5px 10px; border-radius:14px;
+    border:1px solid var(--line); background:var(--white); font-size:11.5px; color:var(--ink-soft); cursor:pointer;
+  }
+  .voice-toggle svg{ width:13px; height:13px; flex:none; }
+  .voice-toggle[aria-pressed="true"]{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+  .voice-toggle:disabled{ opacity:0.4; cursor:not-allowed; }
+  .mic-btn{
+    flex:none; width:38px; border:1px solid var(--line); border-radius:var(--radius);
+    background:var(--white); cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .mic-btn svg{ width:15px; height:15px; }
+  .mic-btn[data-recording="true"]{ background:var(--danger); border-color:var(--danger); }
+  .mic-btn[data-recording="true"] svg{ color:var(--white); }
+  .mic-status{ font-size:10.5px; color:var(--ink-faint); padding:3px 2px 0; min-height:14px; }
+
+  /* ---------- Workspace: single chat ---------- */
+  .app-shell{ display:flex; flex-direction:column; height:100vh; height:100dvh; min-height:0; }
+  .app-header{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    padding:12px 20px; background:var(--paper); border-bottom:1px solid var(--rule); flex:none;
+  }
+  .app-header h1{ font-family:var(--font-display); font-size:18px; font-weight:600; margin:0; }
+  .app-header h1 span{ color:var(--ink-faint); font-weight:400; font-style:italic; font-size:12.5px; margin-left:8px; }
+
+  .chat-feed{ flex:1; min-height:0; overflow-y:auto; padding:20px 0 6px; }
+  .chat-feed-inner{ max-width:720px; margin:0 auto; padding:0 20px; display:flex; flex-direction:column; gap:14px; }
+  .empty-hint{ color:var(--ink-faint); font-size:12.5px; font-style:italic; padding:8px 2px; }
+
+  .msg-row{ display:flex; gap:10px; align-items:flex-start; }
+  .msg-row.user{ justify-content:flex-end; }
+  .msg-row .bubble{
+    max-width:80%; padding:10px 13px; border-radius:10px; font-size:13.5px; line-height:1.55;
+    white-space:pre-wrap; word-wrap:break-word;
+  }
+  .msg-row.user .bubble{ background:var(--ink); color:var(--white); border-bottom-right-radius:2px; }
+  .msg-row.assistant .bubble{ background:var(--white); border:1px solid var(--rule); border-bottom-left-radius:2px; }
+  .msg-row.assistant.thea .bubble{ border-left:3px solid var(--thea); }
+  .msg-row.assistant.drew .bubble{ border-left:3px solid var(--drew); }
+  .msg-row.error .bubble{ background:var(--danger-bg); color:var(--danger); border:1px solid #E0B8AE; }
+  .bubble .persona-name{ display:block; font-family:var(--font-mono); font-size:10px; letter-spacing:0.05em; text-transform:uppercase; margin-bottom:3px; }
+  .msg-row.assistant.thea .persona-name{ color:var(--thea); }
+  .msg-row.assistant.drew .persona-name{ color:var(--drew); }
+
+  .tool-note{ font-family:var(--font-mono); font-size:10.5px; color:var(--ink-faint); padding-left:38px; }
+
+  .typing{ display:flex; gap:4px; padding:6px 4px; }
+  .typing span{ width:5px; height:5px; border-radius:50%; background:var(--ink-faint); animation:blink 1.2s infinite ease-in-out; }
+  .typing span:nth-child(2){ animation-delay:0.15s; }
+  .typing span:nth-child(3){ animation-delay:0.3s; }
+  @keyframes blink{ 0%,80%,100%{opacity:0.25;} 40%{opacity:1;} }
+
+  .diagram-card{ margin-left:38px; border:1px solid var(--rule); border-radius:8px; background:var(--white); overflow:hidden; }
+  .diagram-card svg{ display:block; width:100%; height:auto; background:#fff; }
+  .diagram-legend{ display:flex; flex-wrap:wrap; gap:7px 12px; padding:7px 12px; border-top:1px solid var(--rule); font-size:10px; color:var(--ink-faint); }
+  .diagram-legend span{ display:inline-flex; align-items:center; gap:4px; }
+  .diagram-legend svg{ width:20px; height:8px; flex:none; }
+  .diagram-card-footer{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px;
+    border-top:1px solid var(--rule); background:var(--paper); flex-wrap:wrap;
+  }
+  .diagram-card-stats{ font-family:var(--font-mono); font-size:10.5px; color:var(--ink-faint); }
+  .diagram-card-exports{ display:flex; gap:6px; }
+  .diagram-card-exports button{ font-size:11px; padding:4px 9px; }
+
+  .composer-footer{ border-top:1px solid var(--rule); background:var(--paper); flex:none; }
+  .composer-nudge{
+    max-width:720px; margin:0 auto; padding:9px 20px 0; font-size:11.5px;
+    color:var(--ink-faint); font-style:italic;
+  }
+  .send-row{ display:flex; gap:10px; max-width:720px; margin:0 auto; padding:8px 20px 4px; }
+  .send-btn{
+    flex:1; display:flex; align-items:center; justify-content:center; gap:8px;
+    padding:9px 14px; border-radius:22px; border:1.5px solid var(--rule); background:var(--white);
+    font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .send-btn .avatar{ width:20px; height:20px; margin-top:0; }
+  .send-btn .avatar svg{ width:12px; height:12px; }
+  .send-btn.thea{ color:var(--thea); border-color:var(--thea); }
+  .send-btn.thea:hover{ background:var(--thea-bg); }
+  .send-btn.drew{ color:var(--drew); border-color:var(--drew); }
+  .send-btn.drew:hover{ background:var(--drew-bg); }
+  .send-btn:disabled{ opacity:0.45; cursor:default; }
+
+  .composer{ display:flex; gap:8px; max-width:720px; margin:0 auto; padding:8px 20px 4px; }
+  .composer textarea{
+    flex:1; resize:none; border:1px solid var(--line); border-radius:var(--radius); padding:8px 9px;
+    font-size:13px; height:38px; max-height:120px; background:var(--white);
+  }
+  .composer textarea:focus{ outline:none; border-color:var(--ink-soft); }
+  .composer-hint{ max-width:720px; margin:0 auto; padding:0 20px 12px; }
+</style>
+</head>
+<body>
+
+<div class="screen" id="screen-consent">
+  <div class="screen-card wide">
+    <p class="screen-kicker">Worth a minute before you start</p>
+    <h1 class="screen-title">How this tool works</h1>
+    <div class="consent-scroll">
+    <div class="consent-body">
+
+      <h3>Where your words go</h3>
+      <ul>
+        <li>Whatever you send Thea or Drew is passed to Claude, Anthropic's AI, to generate a reply — that's the whole mechanism behind both personas.</li>
+        <li>This app doesn't keep a copy anywhere. Your conversation lives in this browser tab only; close it or hit refresh and it's gone for good.</li>
+        <li>Once your message reaches Anthropic's side, it's covered by Anthropic's own privacy policy and terms, not this page.</li>
+        <li>Before pasting in an excerpt, strip out anything that could identify a participant, plus anything confidential or proprietary.</li>
+      </ul>
+
+      <h3>What Anthropic does with it</h3>
+      <p>Anthropic may use the content you send Claude to improve their models — their <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">privacy policy</a> has the full picture. This tool itself doesn't collect or train on anything you write here; past the point it leaves your browser, Anthropic's data practices are what govern it.</p>
+
+      <h3>What the AI gets wrong</h3>
+      <ul>
+        <li>They're a sounding board, not a stand-in for your advisor, coauthors, or reviewers.</li>
+        <li>They can misread what you've written or reach the wrong conclusion about it.</li>
+        <li>Neither one knows the live debates in your specific corner of the field, or anything unpublished you haven't told them.</li>
+        <li>They can state something wrong with total confidence.</li>
+        <li>Nothing here comes with a promise about quality or publishability. Treat it as a starting point, not a verdict.</li>
+      </ul>
+
+      <h3>A note on bias</h3>
+      <p>Like any AI trained on existing scholarship, Thea and Drew can gravitate toward familiar methods, frameworks, and academic traditions. If your work sits outside that mainstream — non-Western contexts, understudied populations, less conventional methods — weigh their input accordingly, and don't let it substitute for other perspectives.</p>
+
+      <h3>No one's reading over its shoulder</h3>
+      <p>Every reply is generated automatically, with no person checking it before it reaches you. Verifying what Thea and Drew tell you is on you — nothing either of them says should be taken as final, only as one input to weigh against everything else you know.</p>
+
+      <h3>Check journal policy</h3>
+      <p>Policies on AI assistance vary by journal and keep shifting — some want disclosure, some restrict certain uses outright. Check your target journal's current policy before this tool touches anything that ends up in your submission; getting that wrong is a risk to the whole paper, not just this figure.</p>
+
+      <h3>Questions?</h3>
+      <p>Email Vanessa Conzon (<a href="mailto:conzon@bc.edu">conzon@bc.edu</a>) or Allie Feldberg (<a href="mailto:Afeldberg@hbs.edu">Afeldberg@hbs.edu</a>).</p>
+
+    </div>
+    </div>
+    <label class="consent-check">
+      <input type="checkbox" id="consentCheck">
+      <span>I've read the above, understand what Thea and Drew can and can't do, and have already removed anything sensitive or confidential from what I plan to share.</span>
+    </label>
+    <p class="consent-fineprint">Checking this box means you've read all of this, understand what these two personas can't do, and are taking responsibility for reviewing anything they produce before you rely on it — informed consent for your messages to be processed by Claude, for this tool's educational purpose.</p>
+    <div class="screen-actions" style="justify-content:flex-end;">
+      <button class="tbtn primary big" id="consentContinue" disabled>Continue</button>
+    </div>
+  </div>
+</div>
+
+<div class="screen hidden" id="screen-intake">
+  <div class="screen-card wide">
+
+    <div class="persona-say thea">
+      <div class="avatar avatar-thea avatar-lg">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21h6"/><path d="M10 18h4"/>
+          <path d="M12 3a6.5 6.5 0 0 0-3.8 11.8c.6.45 1 1.1 1 1.9V17h5.6v-.3c0-.8.4-1.45 1-1.9A6.5 6.5 0 0 0 12 3z"/>
+        </svg>
+      </div>
+      <div>
+        <p class="persona-say-name">Thea</p>
+        <p class="persona-say-text">Hi, I'm Thea. I help you think through your ideas and how they relate to each other — I'll take what you've got and push it until it's clear enough to build a figure from.</p>
+      </div>
+    </div>
+
+    <div class="persona-say drew">
+      <div class="avatar avatar-drew avatar-lg">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3C6.5 3 3 6.6 3 11.2c0 3.9 2.8 6.4 5.7 5.9.9-.15 1.7.5 1.4 1.3-.4 1.1.5 2.3 1.7 2.1C17.8 19.8 21 15.9 21 11.2 21 6.6 17.5 3 12 3z"/>
+          <circle cx="8" cy="10" r="1.1" fill="white" stroke="none"/>
+          <circle cx="12" cy="7.3" r="1.1" fill="white" stroke="none"/>
+          <circle cx="16" cy="10" r="1.1" fill="white" stroke="none"/>
+        </svg>
+      </div>
+      <div>
+        <p class="persona-say-name">Drew</p>
+        <p class="persona-say-text">And I'm Drew. Once the thinking's in decent shape, just tell me and I'll turn it into an actual figure — boxes, arrows, whatever it needs. No dragging things around yourself; just tell me what to add or change and I'll redraw it, easy.</p>
+      </div>
+    </div>
+
+    <div class="persona-say thea">
+      <div class="avatar avatar-thea avatar-lg">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21h6"/><path d="M10 18h4"/>
+          <path d="M12 3a6.5 6.5 0 0 0-3.8 11.8c.6.45 1 1.1 1 1.9V17h5.6v-.3c0-.8.4-1.45 1-1.9A6.5 6.5 0 0 0 12 3z"/>
+        </svg>
+      </div>
+      <div>
+        <p class="persona-say-name">Thea</p>
+        <p class="persona-say-text">Before we get going, tell me a few things about what you're working on.</p>
+      </div>
+    </div>
+
+    <label class="field-label" for="intakeOutcome">What's the outcome you're studying?</label>
+    <input type="text" id="intakeOutcome" class="field-input">
+    <label class="check-inline"><input type="checkbox" id="intakeOutcomeUnsure"> I'm not sure</label>
+
+    <label class="field-label">And what do you think is explaining it?<span class="field-hint">List the things you think are driving it — add as many as you like.</span></label>
+    <div class="chip-row">
+      <input type="text" id="intakeFactorInput" class="field-input" placeholder="type one and press Enter">
+      <button class="tbtn" id="intakeFactorAdd" type="button">Add</button>
+    </div>
+    <div class="chip-list" id="intakeFactorList"></div>
+    <label class="check-inline"><input type="checkbox" id="intakeFactorsUnsure"> I'm not sure</label>
+
+    <label class="field-label">What sort of model do you think this is?</label>
+    <div class="radio-group" id="intakeModelType">
+      <label><input type="radio" name="modelType" value="variance"> Variance-based — different groups or cases follow different steps or relationships, producing variation in the outcome</label>
+      <label><input type="radio" name="modelType" value="process"> Process-based — one shared sequence: things unfold or lead to each other over time, in roughly the same way for everyone</label>
+      <label><input type="radio" name="modelType" value="sequential"> Sequential — a series of stages that unfolds in order, though the exact steps may differ slightly across actors</label>
+      <label>
+        <input type="radio" name="modelType" value="other"> Something else
+        <input type="text" id="intakeModelOther" class="field-input inline" placeholder="describe it" disabled>
+      </label>
+      <label><input type="radio" name="modelType" value="unsure" checked> I'm not sure</label>
+    </div>
+
+    <label class="field-label" for="intakeExtra">Anything else you'd like me to know?<span class="field-hint">Optional — context, a data excerpt, a hunch, anything.</span></label>
+    <div class="field-row-mic">
+      <textarea id="intakeExtra" class="field-input" rows="3"></textarea>
+      <button class="mic-btn hidden" id="intakeExtraMic" type="button" title="Dictate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+      </button>
+    </div>
+    <p class="mic-status" id="intakeExtraMicStatus"></p>
+
+    <div class="screen-actions" style="justify-content:flex-end;">
+      <button class="tbtn primary" id="intakeContinue" type="button">Thea thinks</button>
+    </div>
+  </div>
+</div>
+
+<div class="app-shell hidden" id="screen-workspace">
+  <div class="app-header">
+    <h1>Figure Creation Agent <span>a thinking and drawing partner for the development of conceptual figures</span></h1>
+    <button class="voice-toggle" id="voiceToggle" aria-pressed="false" title="Toggle voice replies and dictation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+      <span id="voiceToggleLabel">Voice off</span>
+    </button>
+  </div>
+
+  <div class="chat-feed" id="chatFeed">
+    <div class="chat-feed-inner" id="chatFeedInner"></div>
+  </div>
+
+  <div class="composer-footer">
+    <p class="composer-nudge" id="composerNudge">Keep thinking with Thea, or have Drew draw it?</p>
+    <div class="composer">
+      <button class="mic-btn hidden" id="micBtn" type="button" title="Dictate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+      </button>
+      <textarea id="composerInput" placeholder="Type a message…" rows="1"></textarea>
+    </div>
+    <div class="send-row">
+      <button class="send-btn thea" id="sendTheaBtn" type="button">
+        <span class="avatar avatar-thea">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21h6"/><path d="M10 18h4"/>
+            <path d="M12 3a6.5 6.5 0 0 0-3.8 11.8c.6.45 1 1.1 1 1.9V17h5.6v-.3c0-.8.4-1.45 1-1.9A6.5 6.5 0 0 0 12 3z"/>
+          </svg>
+        </span>
+        Thea thinks
+      </button>
+      <button class="send-btn drew" id="sendDrewBtn" type="button">
+        <span class="avatar avatar-drew">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3C6.5 3 3 6.6 3 11.2c0 3.9 2.8 6.4 5.7 5.9.9-.15 1.7.5 1.4 1.3-.4 1.1.5 2.3 1.7 2.1C17.8 19.8 21 15.9 21 11.2 21 6.6 17.5 3 12 3z"/>
+            <circle cx="8" cy="10" r="1.1" fill="white" stroke="none"/>
+            <circle cx="12" cy="7.3" r="1.1" fill="white" stroke="none"/>
+            <circle cx="16" cy="10" r="1.1" fill="white" stroke="none"/>
+          </svg>
+        </span>
+        Drew draws
+      </button>
+    </div>
+    <p class="mic-status composer-hint" id="composerMicStatus"></p>
+  </div>
+</div>
+
+<svg id="stage" style="display:none" width="1400" height="1000" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="mk-tri" markerWidth="9" markerHeight="9" refX="7.5" refY="4" orient="auto-start-reverse">
+      <path d="M0,0 L9,4 L0,8 Z" fill="#1C1B18"></path>
+    </marker>
+    <marker id="mk-open" markerWidth="10" markerHeight="10" refX="7" refY="4" orient="auto-start-reverse">
+      <path d="M0,0 L8,4 L0,8" fill="none" stroke="#1C1B18" stroke-width="1.4"></path>
+    </marker>
+    <marker id="mk-dot" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+      <circle cx="4" cy="4" r="2.6" fill="#FFFFFF" stroke="#1C1B18" stroke-width="1.2"></circle>
+    </marker>
+  </defs>
+  <g id="layer-groups"></g>
+  <g id="layer-arrows"></g>
+  <g id="layer-shapes"></g>
+</svg>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   STATE  (mutated only via Drew's tools — no direct manipulation)
+   ============================================================ */
+var state = { shapes: [], arrows: [] };
+var idCounter = 0;
+var placeCursor = { x:60, y:60 };
+
+function nextId(prefix){ idCounter++; return prefix + idCounter; }
+function findShape(id){ return state.shapes.filter(function(s){ return s.id===id; })[0]; }
+function findIn(list, id){ return list.filter(function(s){ return s.id===id; })[0]; }
+
+/* ============================================================
+   SHAPE CONSTRUCTION
+   ============================================================ */
+var measureCanvas = document.createElement('canvas');
+var measureCtx = measureCanvas.getContext('2d');
+
+function wrapLabel(text, maxWidth, font){
+  measureCtx.font = font;
+  var words = (text || '').split(/\s+/).filter(Boolean);
+  if(!words.length) return [''];
+  var lines = [];
+  var cur = words[0];
+  for(var i=1;i<words.length;i++){
+    var test = cur + ' ' + words[i];
+    if(measureCtx.measureText(test).width <= maxWidth){
+      cur = test;
+    } else {
+      lines.push(cur);
+      cur = words[i];
+    }
+  }
+  lines.push(cur);
+  return lines;
+}
+
+function defaultSize(type, label){
+  if(type==='text'){
+    measureCtx.font = '12.5px -apple-system, sans-serif';
+    var w = Math.max(40, measureCtx.measureText(label || 'Label').width + 12);
+    return { w: w, h: 22 };
+  }
+  if(type==='ellipse') return { w:180, h:92 };
+  if(type==='group') return { w:260, h:170 };
+  return { w:170, h:70 };
+}
+
+function autoPlace(){
+  var p = { x: placeCursor.x, y: placeCursor.y };
+  placeCursor.x += 210;
+  if(placeCursor.x > 1180){ placeCursor.x = 60; placeCursor.y += 150; }
+  if(placeCursor.y > 860){ placeCursor.y = 60; }
+  return p;
+}
+
+function num(v){
+  if(v==null || v==='') return null;
+  var n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
+function buildShape(type, opts){
+  opts = opts || {};
+  var id = opts.id || nextId('s');
+  var size = defaultSize(type, opts.label || '');
+  var ox = num(opts.x), oy = num(opts.y), ow = num(opts.width), oh = num(opts.height);
+  var pos = (ox!=null && oy!=null) ? { x:ox, y:oy } : autoPlace();
+  return {
+    id: id,
+    type: type,
+    label: opts.label!=null ? opts.label : '',
+    x: ox!=null ? ox : pos.x,
+    y: oy!=null ? oy : pos.y,
+    w: ow || size.w,
+    h: oh || size.h
+  };
+}
+
+/* ============================================================
+   GEOMETRY
+   ============================================================ */
+function shapeCenter(s){ return { x: s.x + s.w/2, y: s.y + s.h/2 }; }
+
+function rectBoundary(s, tx, ty){
+  var c = shapeCenter(s);
+  var dx = tx - c.x, dy = ty - c.y;
+  if(dx===0 && dy===0) return c;
+  var hw = s.w/2, hh = s.h/2;
+  var scaleX = dx!==0 ? hw/Math.abs(dx) : Infinity;
+  var scaleY = dy!==0 ? hh/Math.abs(dy) : Infinity;
+  var scale = Math.min(scaleX, scaleY);
+  return { x: c.x + dx*scale, y: c.y + dy*scale };
+}
+
+function ellipseBoundary(s, tx, ty){
+  var c = shapeCenter(s);
+  var rx = s.w/2, ry = s.h/2;
+  var dx = tx - c.x, dy = ty - c.y;
+  if(dx===0 && dy===0) return c;
+  var denom = Math.sqrt((dx*dx)/(rx*rx) + (dy*dy)/(ry*ry));
+  return { x: c.x + dx/denom, y: c.y + dy/denom };
+}
+
+function boundaryFor(s, tx, ty){
+  return s.type==='ellipse' ? ellipseBoundary(s, tx, ty) : rectBoundary(s, tx, ty);
+}
+
+function computeEdgePoints(fromShape, toShape){
+  var toC = shapeCenter(toShape), fromC = shapeCenter(fromShape);
+  var p1 = boundaryFor(fromShape, toC.x, toC.y);
+  var p2 = boundaryFor(toShape, fromC.x, fromC.y);
+  return { x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y };
+}
+
+var ARROW_STYLE = {
+  causal:       { dasharray:null,        markerEnd:'url(#mk-tri)',  markerStart:null },
+  temporal:     { dasharray:null,        markerEnd:'url(#mk-open)', markerStart:null },
+  conditional:  { dasharray:'6,4',       markerEnd:'url(#mk-tri)',  markerStart:null },
+  feedback:     { dasharray:'1,4,6,4',   markerEnd:'url(#mk-tri)',  markerStart:null },
+  coOccurrence: { dasharray:'1,3.5',     markerEnd:'url(#mk-dot)',  markerStart:'url(#mk-dot)' }
+};
+
+var LEGEND_HTML =
+  '<span><svg viewBox="0 0 30 10"><line x1="0" y1="5" x2="26" y2="5" stroke="#1C1B18" stroke-width="1.6" marker-end="url(#mk-tri)"/></svg> causal</span>' +
+  '<span><svg viewBox="0 0 30 10"><line x1="0" y1="5" x2="26" y2="5" stroke="#1C1B18" stroke-width="1.6" marker-end="url(#mk-open)"/></svg> temporal</span>' +
+  '<span><svg viewBox="0 0 30 10"><line x1="0" y1="5" x2="26" y2="5" stroke="#1C1B18" stroke-width="1.6" stroke-dasharray="6,4" marker-end="url(#mk-tri)"/></svg> conditional</span>' +
+  '<span><svg viewBox="0 0 30 10"><line x1="0" y1="5" x2="26" y2="5" stroke="#1C1B18" stroke-width="1.6" stroke-dasharray="1,4,6,4" marker-end="url(#mk-tri)"/></svg> feedback</span>' +
+  '<span><svg viewBox="0 0 30 10"><line x1="0" y1="5" x2="26" y2="5" stroke="#1C1B18" stroke-width="1.6" stroke-dasharray="1,3.5" marker-start="url(#mk-dot)" marker-end="url(#mk-dot)"/></svg> co-occurs</span>';
+
+/* ============================================================
+   RENDERING  (renders a given {shapes, arrows} into the hidden
+   scratch stage; every function takes the snapshot explicitly so
+   Drew's live edits and a frozen historical diagram card never
+   get mixed up)
+   ============================================================ */
+var SVGNS = 'http://www.w3.org/2000/svg';
+var stage = document.getElementById('stage');
+
+function svgEl(tag, attrs){
+  var el = document.createElementNS(SVGNS, tag);
+  if(attrs){
+    Object.keys(attrs).forEach(function(k){
+      if(attrs[k]!=null) el.setAttribute(k, attrs[k]);
+    });
+  }
+  return el;
+}
+
+function renderTspans(textEl, lines, cx, cy){
+  var lh = 15;
+  var startY = cy - ((lines.length-1)*lh)/2;
+  lines.forEach(function(line, i){
+    var ts = svgEl('tspan', { x:cx, y: startY + i*lh });
+    ts.textContent = line;
+    textEl.appendChild(ts);
+  });
+}
+
+function renderGroups(snap){
+  var layer = document.getElementById('layer-groups');
+  layer.innerHTML = '';
+  snap.shapes.filter(function(s){ return s.type==='group'; }).forEach(function(s){
+    var g = svgEl('g', {});
+    var body = svgEl('rect', { x:s.x, y:s.y, width:s.w, height:s.h, rx:6, ry:6, class:'shape-body group' });
+    g.appendChild(body);
+    if(s.label){
+      var t = svgEl('text', { x:s.x+10, y:s.y-8, class:'group-label' });
+      t.textContent = s.label;
+      g.appendChild(t);
+    }
+    layer.appendChild(g);
+  });
+}
+
+function renderShapes(snap){
+  var layer = document.getElementById('layer-shapes');
+  layer.innerHTML = '';
+  snap.shapes.filter(function(s){ return s.type!=='group'; }).forEach(function(s){
+    var g = svgEl('g', {});
+    if(s.type==='text'){
+      var t = svgEl('text', { class:'shape-label', 'text-anchor':'middle', 'dominant-baseline':'middle' });
+      var lines = wrapLabel(s.label, Math.max(s.w-4,20), '12.5px -apple-system, sans-serif');
+      renderTspans(t, lines, s.x+s.w/2, s.y+s.h/2);
+      g.appendChild(t);
+    } else {
+      var body;
+      if(s.type==='ellipse'){
+        body = svgEl('ellipse', { cx:s.x+s.w/2, cy:s.y+s.h/2, rx:s.w/2, ry:s.h/2, class:'shape-body' });
+      } else {
+        body = svgEl('rect', {
+          x:s.x, y:s.y, width:s.w, height:s.h,
+          rx: s.type==='roundRect' ? 10 : 0, ry: s.type==='roundRect' ? 10 : 0,
+          class:'shape-body'
+        });
+      }
+      g.appendChild(body);
+      var lbl = svgEl('text', { class:'shape-label', 'text-anchor':'middle', 'dominant-baseline':'middle' });
+      var wrapLines = wrapLabel(s.label, Math.max(s.w-20,20), '12.5px -apple-system, sans-serif');
+      renderTspans(lbl, wrapLines, s.x+s.w/2, s.y+s.h/2);
+      g.appendChild(lbl);
+    }
+    layer.appendChild(g);
+  });
+}
+
+function renderArrows(snap){
+  var layer = document.getElementById('layer-arrows');
+  layer.innerHTML = '';
+  snap.arrows.forEach(function(a){
+    var from = findIn(snap.shapes, a.from), to = findIn(snap.shapes, a.to);
+    if(!from || !to) return;
+    var pts = computeEdgePoints(from, to);
+    var style = ARROW_STYLE[a.type] || ARROW_STYLE.causal;
+    var g = svgEl('g', {});
+    var line = svgEl('line', {
+      x1:pts.x1, y1:pts.y1, x2:pts.x2, y2:pts.y2, class:'arrow-line',
+      'stroke-dasharray': style.dasharray, 'marker-end': style.markerEnd, 'marker-start': style.markerStart
+    });
+    g.appendChild(line);
+    if(a.label){
+      var mx=(pts.x1+pts.x2)/2, my=(pts.y1+pts.y2)/2;
+      var font = 'italic 11px -apple-system, sans-serif';
+      var alines = wrapLabel(a.label, 140, font);
+      measureCtx.font = font;
+      var lw = Math.max.apply(null, alines.map(function(l){ return measureCtx.measureText(l).width; })) + 8;
+      var lh2 = alines.length*13 + 4;
+      var bg = svgEl('rect', { x:mx-lw/2, y:my-lh2/2, width:lw, height:lh2, class:'arrow-label-bg' });
+      g.appendChild(bg);
+      var lt = svgEl('text', { class:'arrow-label', 'text-anchor':'middle', 'dominant-baseline':'middle' });
+      renderTspans(lt, alines, mx, my);
+      g.appendChild(lt);
+    }
+    layer.appendChild(g);
+  });
+}
+
+function renderToStage(snap){
+  renderGroups(snap);
+  renderArrows(snap);
+  renderShapes(snap);
+}
+
+function computeContentBBox(shapes){
+  if(!shapes.length) return { x:0, y:0, w:420, h:180 };
+  var pad = 40;
+  var minX = Math.min.apply(null, shapes.map(function(s){return s.x;})) - pad;
+  var minY = Math.min.apply(null, shapes.map(function(s){return s.y;})) - pad;
+  var maxX = Math.max.apply(null, shapes.map(function(s){return s.x+s.w;})) + pad;
+  var maxY = Math.max.apply(null, shapes.map(function(s){return s.y+s.h;})) + pad;
+  return { x:minX, y:minY, w:maxX-minX, h:maxY-minY };
+}
+
+var EXPORT_CSS =
+  '.shape-body{fill:#FFFFFF;stroke:#1C1B18;stroke-width:1.4;}' +
+  '.shape-body.group{fill:none;stroke:#8A8676;stroke-dasharray:5,4;stroke-width:1.4;}' +
+  '.shape-label{font-family:Georgia,serif;fill:#1C1B18;font-size:12.5px;}' +
+  '.group-label{font-family:Consolas,monospace;fill:#8A8676;font-size:10.5px;letter-spacing:0.04em;}' +
+  '.arrow-line{fill:none;stroke:#1C1B18;stroke-width:1.6;}' +
+  '.arrow-label-bg{fill:#F7F5F0;opacity:0.92;}' +
+  '.arrow-label{font-family:Georgia,serif;font-style:italic;font-size:11px;fill:#5B584E;}';
+
+function buildExportSVG(shapes, arrows){
+  var snap = { shapes: shapes, arrows: arrows };
+  renderToStage(snap);
+  var bbox = computeContentBBox(shapes);
+  var clone = stage.cloneNode(true);
+  clone.removeAttribute('style');
+  clone.removeAttribute('id');
+  Array.prototype.forEach.call(clone.querySelectorAll('[id]'), function(el){ el.removeAttribute('id'); });
+  clone.setAttribute('viewBox', bbox.x + ' ' + bbox.y + ' ' + bbox.w + ' ' + bbox.h);
+  clone.setAttribute('width', Math.round(bbox.w));
+  clone.setAttribute('height', Math.round(bbox.h));
+  var bgRect = svgEl('rect', { x:bbox.x, y:bbox.y, width:bbox.w, height:bbox.h, fill:'#FFFFFF' });
+  var style = document.createElementNS(SVGNS, 'style');
+  style.textContent = EXPORT_CSS;
+  clone.insertBefore(style, clone.firstChild);
+  clone.insertBefore(bgRect, clone.firstChild.nextSibling);
+  return { svg: clone, bbox: bbox };
+}
+
+function downloadBlob(content, filename, type){
+  var blob = new Blob([content], { type: type });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+
+function exportSVG(shapes, arrows){
+  var built = buildExportSVG(shapes, arrows);
+  var xml = new XMLSerializer().serializeToString(built.svg);
+  downloadBlob('<?xml version="1.0" standalone="no"?>\n' + xml, 'figure.svg', 'image/svg+xml');
+}
+
+function exportPNG(shapes, arrows){
+  var built = buildExportSVG(shapes, arrows);
+  var xml = new XMLSerializer().serializeToString(built.svg);
+  var svg64 = btoa(unescape(encodeURIComponent('<?xml version="1.0" standalone="no"?>' + xml)));
+  var img = new Image();
+  img.onload = function(){
+    var scale = 2;
+    var canvas = document.createElement('canvas');
+    canvas.width = built.bbox.w*scale; canvas.height = built.bbox.h*scale;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(function(blob){
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'figure.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    }, 'image/png');
+  };
+  img.onerror = function(){ alert('PNG export could not render the diagram. Try SVG export instead.'); };
+  img.src = 'data:image/svg+xml;base64,' + svg64;
+}
+
+function exportPPTX(shapes, arrows){
+  if(typeof window.PptxGenJS === 'undefined'){
+    alert('The PowerPoint export library did not load (needs network access to cdnjs.cloudflare.com). Try SVG or PNG export instead.');
+    return;
+  }
+  var pptx = new window.PptxGenJS();
+  pptx.defineLayout({ name:'FC', width:13.333, height:9.524 });
+  pptx.layout = 'FC';
+  var slide = pptx.addSlide();
+  var bbox = computeContentBBox(shapes);
+  var s2i = 13.333/bbox.w;
+  function px(v){ return (v-bbox.x)*s2i; }
+  function py(v){ return (v-bbox.y)*s2i; }
+
+  shapes.filter(function(s){ return s.type==='group'; }).forEach(function(s){
+    slide.addShape(pptx.ShapeType.rect, {
+      x:px(s.x), y:py(s.y), w:s.w*s2i, h:s.h*s2i,
+      fill:{ type:'none' }, line:{ color:'8A8676', width:1, dashType:'dash' }
+    });
+    if(s.label){
+      slide.addText(s.label, { x:px(s.x), y:py(s.y)-0.22, w:s.w*s2i, h:0.2, fontFace:'Consolas', fontSize:8, color:'8A8676' });
+    }
+  });
+
+  arrows.forEach(function(a){
+    var from = findIn(shapes, a.from), to = findIn(shapes, a.to);
+    if(!from || !to) return;
+    var pts = computeEdgePoints(from, to);
+    var dashMap = { causal:'solid', temporal:'solid', conditional:'dash', feedback:'lgDashDot', coOccurrence:'sysDot' };
+    var x1=px(pts.x1), y1=py(pts.y1), x2=px(pts.x2), y2=py(pts.y2);
+    slide.addShape(pptx.ShapeType.line, {
+      x:Math.min(x1,x2), y:Math.min(y1,y2), w:Math.max(Math.abs(x2-x1),0.01), h:Math.max(Math.abs(y2-y1),0.01),
+      flipH: x2 < x1, flipV: y2 < y1,
+      line:{ color:'1C1B18', width:1.25, dashType: dashMap[a.type] || 'solid',
+        endArrowType: a.type==='coOccurrence' ? 'none' : (a.type==='temporal' ? 'arrow' : 'triangle') }
+    });
+    if(a.label){
+      var mx=(x1+x2)/2, my=(y1+y2)/2;
+      slide.addText(a.label, { x:mx-0.6, y:my-0.14, w:1.2, h:0.28, fontFace:'Georgia', italic:true, fontSize:9, align:'center', color:'5B584E', fill:{ color:'F7F5F0' } });
+    }
+  });
+
+  shapes.filter(function(s){ return s.type!=='group'; }).forEach(function(s){
+    if(s.type==='text'){
+      slide.addText(s.label||'', { x:px(s.x), y:py(s.y), w:s.w*s2i, h:s.h*s2i, fontFace:'Georgia', fontSize:11, color:'1C1B18', valign:'middle' });
+      return;
+    }
+    var shapeType = s.type==='ellipse' ? pptx.ShapeType.ellipse : s.type==='roundRect' ? pptx.ShapeType.roundRect : pptx.ShapeType.rect;
+    slide.addText(s.label||'', {
+      shape: shapeType, x:px(s.x), y:py(s.y), w:s.w*s2i, h:s.h*s2i,
+      fill:{ color:'FFFFFF' }, line:{ color:'1C1B18', width:1.25 },
+      align:'center', valign:'middle', fontFace:'Arial', fontSize:11, color:'1C1B18'
+    });
+  });
+
+  pptx.writeFile({ fileName:'figure.pptx' });
+}
+
+/* ============================================================
+   DREW'S TOOLS
+   ============================================================ */
+function resyncGroupBounds(g){
+  var members = (g.memberIds || []).map(findShape).filter(Boolean);
+  if(!members.length) return;
+  var pad = 28;
+  g.x = Math.min.apply(null, members.map(function(m){return m.x;})) - pad;
+  g.y = Math.min.apply(null, members.map(function(m){return m.y;})) - pad - 14;
+  var maxX = Math.max.apply(null, members.map(function(m){return m.x+m.w;})) + pad;
+  var maxY = Math.max.apply(null, members.map(function(m){return m.y+m.h;})) + pad;
+  g.w = maxX - g.x;
+  g.h = maxY - g.y;
+}
+
+function computeAutoLayout(targetIds){
+  var targets = (targetIds && targetIds.length)
+    ? state.shapes.filter(function(s){ return targetIds.indexOf(s.id) > -1 && s.type!=='group'; })
+    : state.shapes.filter(function(s){ return s.type!=='group'; });
+  if(!targets.length) return { moved:0, layers:0 };
+  var idSet = {};
+  targets.forEach(function(s){ idSet[s.id] = true; });
+  var forwardArrows = state.arrows.filter(function(a){
+    return (a.type==='causal' || a.type==='temporal' || a.type==='conditional') && idSet[a.from] && idSet[a.to];
+  });
+  var layer = {};
+  targets.forEach(function(s){ layer[s.id] = 0; });
+  for(var iter=0; iter<targets.length; iter++){
+    forwardArrows.forEach(function(a){
+      if(layer[a.from] + 1 > layer[a.to]) layer[a.to] = layer[a.from] + 1;
+    });
+  }
+  var byLayer = {};
+  targets.forEach(function(s){
+    var L = layer[s.id];
+    (byLayer[L] = byLayer[L] || []).push(s);
+  });
+  var layerKeys = Object.keys(byLayer).map(Number).sort(function(a,b){ return a-b; });
+  var colX = 80;
+  layerKeys.forEach(function(L){
+    var col = byLayer[L];
+    var rowY = 60;
+    col.forEach(function(s){
+      s.x = colX;
+      s.y = rowY;
+      rowY += s.h + 60;
+    });
+    colX += 260;
+  });
+  return { moved: targets.length, layers: layerKeys.length };
+}
+
+function executeDrewTool(name, input){
+  try{
+    switch(name){
+      case 'add_shape': {
+        var shape = buildShape(input.type, { label:input.label, x:input.x, y:input.y, width:input.width, height:input.height });
+        state.shapes.push(shape);
+        return { ok:true, id:shape.id, shape:shape };
+      }
+      case 'add_arrow': {
+        if(!findShape(input.from) || !findShape(input.to)) return { ok:false, error:'from/to must be existing shape ids' };
+        var arrow = { id: nextId('e'), from: input.from, to: input.to, label: input.label || '', type: input.type || 'causal' };
+        state.arrows.push(arrow);
+        return { ok:true, id:arrow.id, arrow:arrow };
+      }
+      case 'update_shape': {
+        var s = findShape(input.id);
+        if(!s) return { ok:false, error:'no such shape id' };
+        if(input.label!=null) s.label = input.label;
+        if(input.type!=null) s.type = input.type;
+        var ix=num(input.x), iy=num(input.y), iw=num(input.width), ih=num(input.height);
+        if(ix!=null) s.x = ix;
+        if(iy!=null) s.y = iy;
+        if(iw!=null) s.w = iw;
+        if(ih!=null) s.h = ih;
+        return { ok:true, shape:s };
+      }
+      case 'update_arrow': {
+        var a = state.arrows.filter(function(x){ return x.id===input.id; })[0];
+        if(!a) return { ok:false, error:'no such arrow id' };
+        if(input.label!=null) a.label = input.label;
+        if(input.type!=null) a.type = input.type;
+        if(input.from!=null) a.from = input.from;
+        if(input.to!=null) a.to = input.to;
+        return { ok:true, arrow:a };
+      }
+      case 'delete_element': {
+        var sIdx = -1;
+        for(var i=0;i<state.shapes.length;i++){ if(state.shapes[i].id===input.id){ sIdx=i; break; } }
+        if(sIdx > -1){
+          state.shapes.splice(sIdx,1);
+          state.arrows = state.arrows.filter(function(x){ return x.from!==input.id && x.to!==input.id; });
+          return { ok:true };
+        }
+        var aIdx = -1;
+        for(var j=0;j<state.arrows.length;j++){ if(state.arrows[j].id===input.id){ aIdx=j; break; } }
+        if(aIdx > -1){ state.arrows.splice(aIdx,1); return { ok:true }; }
+        return { ok:false, error:'no such id' };
+      }
+      case 'group_shapes': {
+        var members = (input.shapeIds||[]).map(findShape).filter(Boolean);
+        if(!members.length) return { ok:false, error:'no valid shape ids' };
+        var g = { id: nextId('s'), type:'group', label: input.label || '', memberIds: members.map(function(m){return m.id;}), x:0, y:0, w:0, h:0 };
+        resyncGroupBounds(g);
+        state.shapes.unshift(g);
+        return { ok:true, id:g.id, group:g };
+      }
+      case 'auto_layout': {
+        var res = computeAutoLayout(input.shapeIds);
+        state.shapes.filter(function(s){ return s.type==='group' && s.memberIds && s.memberIds.length; }).forEach(function(g){
+          resyncGroupBounds(g);
+        });
+        return { ok:true, moved: res.moved, columns: res.layers };
+      }
+      default:
+        return { ok:false, error:'unknown tool: ' + name };
+    }
+  } catch(e){
+    return { ok:false, error:String(e && e.message || e) };
+  }
+}
+
+function toolNote(name, input, result){
+  if(result && result.ok===false) return 'Drew tried to ' + name + ' but hit a problem: ' + result.error;
+  switch(name){
+    case 'add_shape': return '+ ' + input.type + ' "' + (input.label||'') + '"  (' + result.id + ')';
+    case 'add_arrow': return '+ arrow ' + input.from + ' \u2192 ' + input.to + '  [' + input.type + ']' + (input.label ? ' "' + input.label + '"' : '');
+    case 'update_shape': return '~ updated ' + input.id;
+    case 'update_arrow': return '~ updated arrow ' + input.id;
+    case 'delete_element': return '\u2212 removed ' + input.id;
+    case 'group_shapes': return '+ group "' + (input.label||'') + '" around ' + (input.shapeIds||[]).join(', ');
+    case 'auto_layout': return '\u21c6 rearranged ' + (result.moved!=null ? result.moved : '') + ' shape(s) into ' + (result.columns!=null ? result.columns : '') + ' column(s)';
+    default: return name;
+  }
+}
+
+// Drew responds with a single JSON object (message + actions) instead of
+// using the API's tools/tool_use mechanism — the artifact API proxy has
+// been observed silently stripping custom tool parameters before they
+// reach the model, so this JSON-in-text approach is what actually works:
+// it only needs system + messages, the same call shape Thea already uses.
+//
+// The model can still occasionally revert to a different, more deeply
+// trained tool-calling convention -- literal <function_calls><invoke
+// name="...">...</invoke></function_calls> tags -- despite being told not
+// to. tryParseInvokeXml() is a safety net that understands that shape too,
+// so a slip doesn't dump raw tags into the chat or silently do nothing.
+function tryParseInvokeXml(text){
+  var invokeRe = /<invoke\s+name="([^"]+)"\s*>([\s\S]*?)<\/invoke>/g;
+  var actions = [];
+  var m;
+  while((m = invokeRe.exec(text))){
+    var toolName = m[1];
+    var inner = m[2];
+    var input = {};
+    var paramRe = /<parameter\s+name="([^"]+)"\s*>([\s\S]*?)<\/parameter>/g;
+    var pm;
+    while((pm = paramRe.exec(inner))){
+      input[pm[1]] = pm[2].trim();
+    }
+    var action = { tool: toolName, input: input };
+    if(input.tempId){ action.tempId = input.tempId; delete input.tempId; }
+    actions.push(action);
+  }
+  return actions;
+}
+
+function parseDrewResponse(text){
+  var raw = text || '';
+  var cleaned = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+  try{
+    var obj = JSON.parse(cleaned);
+    return {
+      message: typeof obj.message === 'string' ? obj.message : '',
+      actions: Array.isArray(obj.actions) ? obj.actions : []
+    };
+  } catch(e){
+    var xmlActions = tryParseInvokeXml(raw);
+    if(xmlActions.length){
+      var lead = raw.split('<function_calls>')[0].trim();
+      return { message: lead, actions: xmlActions };
+    }
+    // Nothing recognizable parsed. If it still looks like a broken attempt
+    // at tool-call syntax, don't dump raw tags into the chat -- show a
+    // clean message instead. Otherwise the text is probably just a plain
+    // reply that didn't need the JSON envelope; show it as-is.
+    if(/<function_calls|<invoke/.test(raw)){
+      return { message: "Drew tried to make a change but the response wasn't in a format this chat could read — try asking again.", actions: [] };
+    }
+    return { message: raw, actions: [] };
+  }
+}
+
+// Runs Drew's actions in order, resolving any tempId references to shapes
+// created earlier in the SAME batch (e.g. add_shape{tempId:"a"} followed by
+// add_arrow{from:"a", to:"s2"}) to their real ids before executing.
+function runDrewActions(actions){
+  var tempMap = {};
+  function resolve(id){
+    return (id!=null && Object.prototype.hasOwnProperty.call(tempMap, id)) ? tempMap[id] : id;
+  }
+  var results = [];
+  var diagramChanged = false;
+  actions.forEach(function(action){
+    var raw = action.input || {};
+    var input = {};
+    Object.keys(raw).forEach(function(k){ input[k] = raw[k]; });
+    if(input.from != null) input.from = resolve(input.from);
+    if(input.to != null) input.to = resolve(input.to);
+    if(input.id != null) input.id = resolve(input.id);
+    if(Array.isArray(input.shapeIds)) input.shapeIds = input.shapeIds.map(resolve);
+
+    var result = executeDrewTool(action.tool, input);
+    if(action.tempId && result && result.id) tempMap[action.tempId] = result.id;
+    if(result && result.ok !== false) diagramChanged = true;
+    results.push({ tool: action.tool, input: input, result: result });
+  });
+  return { results: results, diagramChanged: diagramChanged };
+}
+
+/* ============================================================
+   SYSTEM PROMPTS
+   ============================================================ */
+var THEA_SYSTEM = `## Who you are
+
+You are Thea. You help qualitative management researchers develop process
+models — figures built from boxes and arrows showing how constructs relate,
+unfold, or produce an outcome. Your job is the conceptual work that has to
+happen before anyone draws anything: what the constructs actually are, what
+job each arrow is doing, and whether the relationships between them are
+specific and clear enough to build a figure from.
+
+Judging whether this is a novel or publishable contribution isn't your
+call — that's the researcher's and their advisors', and you don't have
+their command of the literature to make it anyway. Your job is narrower
+and more useful: take their own ideas and the relationships between them
+and push until the thinking is sharp enough to build a real figure on.
+
+You are not a general writing assistant and you don't default to being
+agreeable. You have a job: push the researcher's raw material toward
+something specific enough to draw.
+
+## Voice
+
+State your call, then explain it — lead with the conclusion, not a
+warm-up. Don't hedge, don't apologize, don't soften a real problem with
+"just a thought" or "you might consider." You're not here to be liked;
+you're here to make the figure better, and that means being willing to
+tell the researcher their arrow doesn't hold up or their box is noise. If
+the researcher pushes back, hold your position unless they've given you a
+genuinely new piece of information — a detail about the data, the context,
+or their argument that changes the picture. "I'd rather keep it this way"
+is not new information. A fact you didn't have before is. Don't soften a
+firm call into a question just to keep things comfortable.
+
+You can be wrong. When you are, say so plainly and move on — no extended
+apology, no self-flagellation.
+
+## You are a thought partner, not a form
+
+The researcher answers a few questions on an intake screen before this
+conversation starts, and you receive their answers as the first message, in
+their own words: the outcome, what they think is explaining it, what sort of
+model they're picturing (variance-based, process-based, sequential, or not
+sure), and anything else they wanted you to know. Don't re-ask those. Open
+with a brief, honest initial read instead: what their answers suggest about
+the shape of the figure, and the first real tension or question worth
+sitting with. From there, work like a thought partner — asking questions
+that sharpen their thinking, not just gathering information to hand off.
+Drew is the one who turns settled decisions into a picture; your job is
+making sure there's something worth drawing before that happens, and
+nobody should feel pushed toward a figure before the thinking underneath
+it is real.
+
+If their model-type answer was "variance-based," they're describing
+different cases or groups following different steps or relationships,
+producing variation in the outcome — check whether the figure needs to
+carry that variation explicitly (branches, a typology, moderating
+conditions) rather than flattening it into one path. If it was
+"process-based" or "sequential," that's a process/sequence figure,
+possibly with phases — check whether every case actually follows the same
+path or whether some of that variation is hiding underneath a claim of
+uniformity. If they weren't sure, don't force it; work it out together
+from what they've told you and whatever material they share next.
+
+Once you've given that initial read, ask — briefly, and only what you
+still need — grounding questions that build on what they've already told
+you: what's really driving the outcome, whether cases vary or follow the
+same path, what job each explaining factor is doing. Skip anything their
+answers already settled, and say what you inferred so they can correct
+you.
+
+## The judgment calls you make
+
+- What the arrows mean. Every arrow is a claim: causal, temporal
+  sequence, conditional/moderating, feedback, or "these co-occur but I'm not
+  claiming direction." Push until the researcher can say which, out loud, for
+  every arrow. An arrow nobody can explain doesn't survive review — cut it or
+  name it.
+- What counts as a box vs. what's noise. A construct earns a box if it
+  does independent work in the story. If two boxes always co-occur and never
+  appear apart in the data, they're probably one construct wearing two names.
+- Whether the relationships actually hang together. Ask what mechanism
+  connects one box to the next — if the honest answer is "because that's
+  what happened," the relationship needs sharpening before it belongs in a
+  figure. This is about clarity, not about whether the idea is novel or
+  significant enough for a journal; that judgment is the researcher's and
+  their advisors' to make, not yours.
+- Complexity ceiling. Past roughly 7-9 boxes without grouping or phases,
+  a process model stops being readable and starts being a data dump with
+  arrows. Say so directly and push toward grouping, phases, or cutting.
+- Reciprocal vs. duplicated arrows. Two separate one-directional arrows
+  between the same pair of boxes going opposite ways is usually a mistake,
+  not a finding — check whether they mean one genuinely bidirectional
+  relationship (one arrow, double-headed) or two distinct, differently-timed
+  effects that need different labels to make sense as separate arrows.
+
+## Offer to theorize the arrows
+
+Once the boxes feel reasonably settled, ask the researcher directly
+whether they want to theorize the arrows — a phrase from Martha Feldman
+for slowing down on the relationship each arrow represents instead of
+just naming it. It means sitting with a single arrow and working through
+what's actually happening inside it: the mechanism, who or what is
+acting, what changes and how. Offer this explicitly ("want to theorize
+the arrows for a bit?") rather than doing it silently — it's a distinct
+mode of work from settling what the boxes are, and naming the shift helps
+the researcher engage with it on purpose rather than rushing past it.
+This is usually the right moment once boxes are stable but arrows are
+still thin, or whenever the researcher is naming arrows quickly without
+examining what's inside them.
+
+## What you watch for and call out unprompted
+
+- Unlabeled arrows — an arrow without a label is a promise a reviewer will
+  ask them to keep.
+- Orphaned boxes — a construct connected to nothing is clutter or an
+  unfinished thought; connect it or cut it.
+- Boxes that are really the outcome variable in disguise, sitting in the
+  middle of the model instead of at the end.
+- A "process" model that's actually static (no temporal or causal ordering
+  implied anywhere) — that's a framework, not a process model, and calling
+  it one will read oddly to reviewers who know the difference.
+
+## Handing off to build the figure
+
+Once the shape is genuinely settled — not before — tell the researcher
+they're ready to bring this to Drew, and summarize, in plain prose, the
+boxes, groups, arrows (with type and label), and phases the model should
+have. Don't generate this early just because the researcher asks for
+something to look at — a premature figure anchors people on the wrong
+shape. Say so if they ask before the concepts are settled, and offer a
+rough sketch explicitly labeled as provisional instead.
+
+## Limits, stated plainly when relevant
+
+You are not a substitute for a coauthor, an advisor, or peer review, and
+you don't assess whether this work is a strong enough contribution to
+publish — that's not something you have the standing or the context to
+judge. You can misread a literature you don't have full context on, and you
+don't know this researcher's field's current debates unless they tell you.
+Say when you're uncertain rather than sounding more confident than you are.
+Encourage the researcher to check their target journal's policy on
+AI-assisted work before they rely on this for anything that ends up in the
+paper.
+
+## About Drew
+
+Drew is a separate persona sharing this same conversation and the same
+diagram. He turns settled decisions into actual boxes and arrows and
+shows the researcher the result right here in the chat — that's his job,
+not yours. If the researcher asks you to draw or move something, tell
+them plainly that's Drew's job, and they can just address him directly.
+His turns in this shared history appear as a raw JSON object — that's
+just his internal format for describing diagram edits, not something
+he's showing the researcher. Read the "message" field for what he
+actually said and ignore the rest.`;
+
+var DREW_SYSTEM_BASE = `You are Drew, the diagram-building partner sharing this conversation with
+Thea. Where Thea decides what a process model should claim, you decide how
+it should look and you build it — by calling tools that add, move, restyle,
+and connect real shapes. There's no manual dragging on the researcher's
+end: everything you build shows up as a diagram right here in the chat, and
+if something needs to change, they'll tell you and you'll change it. You're
+easygoing about most of this, but if a described relationship would
+genuinely render as a mess — arrows crossing through boxes they don't
+connect to, a pile of same-size boxes with no hierarchy, a bidirectional
+claim drawn as two overlapping one-way arrows — you'll mention it and
+suggest a fix before drawing it, not after. No big deal about it, just a
+quick heads-up.
+
+## Voice
+Chill, low-key, easy to work with. State what you did in a relaxed,
+matter-of-fact way — not a pitch, not a big declaration. You're happy to
+go along with what the researcher wants and adjust without friction; when
+something's genuinely off you'll say so, but conversationally, more "hey,
+this might get messy" than a hard stop. Talk about the drawing the way a
+good technical illustrator talks shop — in terms of what a reader's eye
+will do, not vague aesthetic language like "make it pop." Don't say
+"great idea!" reflexively; just say what you did and why, in one or two
+relaxed sentences, after you've done it.
+
+## What you do
+When the researcher describes something, translate it into shapes and
+arrows with your tools, then narrate the change briefly. Example:
+"organizational slack leads to experimentation, which feeds back into
+slack over time" is two boxes and two arrows — one forward, one back, both
+labeled — not a single double-headed arrow, since a feedback loop is two
+distinct claims about direction and timing, not one reciprocal
+relationship.
+
+You also handle the other half of your job: layout and readability, on
+request. "Clean this up," "improve the layout," "this feels cluttered,"
+"make it more readable" are all requests to act on, not just discuss. Use
+auto_layout for a full rearrange (it lays targets out left-to-right by
+causal/temporal/conditional flow into columns, leaving feedback and
+co-occurrence arrows to curve however they need to) or update_shape for a
+smaller, targeted nudge. Say what the layout is now doing for the reader —
+"left-to-right by causal order so the eye follows the story forward, with
+the feedback arrow curving back against the flow" — not just that you
+moved things.
+
+Place things so the model stays readable, not just in whatever order they
+were mentioned: left-to-right for anything with a temporal or causal
+direction, grouped visually (group_shapes) when boxes share a category,
+consistent sizing unless size is deliberately meaningful. Ask before
+guessing when a description is genuinely ambiguous (no clear direction, a
+box that could be one construct or two) — but don't ask about things you
+can reasonably decide yourself, like exact position or minor spacing.
+
+## Judgment calls you make
+- Arrow type from the language used. "Leads to," "causes," "drives" ->
+  causal, one direction. "Over time," "eventually" -> consider whether
+  this is really two stages, not one arrow. "Correlates with," "relates
+  to" -> flag that this reads as non-causal and check whether that's
+  intended.
+- One relationship, one arrow. A described back-and-forth is almost
+  always two arrows with two different labels, not one bidirectional
+  arrow — say this explicitly rather than silently picking one.
+- More than about 6-7 boxes with any shared category membership ->
+  propose a grouping container via group_shapes rather than just placing
+  them in a row and hoping it reads.
+- When a description doesn't fit cleanly (too many simultaneous
+  relationships, a genuinely tangled structure), say so plainly rather
+  than forcing a cramped layout, and suggest what to cut or split into a
+  second figure.
+
+## Boundaries
+You build what the researcher and Thea have already decided the model
+should claim — you don't invent new theoretical relationships on your own
+initiative. If asked to add a relationship that hasn't come up before,
+that's legitimate, but treat it as a new claim worth a beat of scrutiny
+("what's the mechanism there?"), not something to silently draw. You are
+not a substitute for Thea's conceptual role — if the conversation drifts
+from "how should this look" into "is this actually a strong contribution,"
+say plainly that's Thea's call, not yours (and honestly, neither of you
+can judge that from inside this chat — that's for the researcher and
+their advisors).
+
+## How you make changes
+
+You don't have API tool-calling here — respond with a single JSON object
+and nothing else: no markdown code fences, no preamble, no text outside
+the object. Its shape is:
+
+{
+  "message": "one or two relaxed sentences — what you did and why, or your question if you're checking something first",
+  "actions": [
+    { "tool": "add_shape", "tempId": "a", "input": { "type": "roundRect", "label": "Organizational slack" } },
+    { "tool": "add_arrow", "input": { "from": "a", "to": "s2", "label": "increases", "type": "causal" } }
+  ]
+}
+
+If nothing on the canvas needs to change — the researcher's just asking a
+question, or you need to check something first — "actions" is an empty
+array and "message" carries your answer. The updated figure appears as a
+fresh card in the chat right after your message, so don't describe the
+picture back to them in prose — just say what you did and why.
+
+Available actions and their input:
+- add_shape: { type: rect|roundRect|ellipse|text|group, label, x?, y?, width?, height? } — position and size are optional, omit them for a sensible default placement.
+- add_arrow: { from, to, label, type: causal|temporal|conditional|feedback|coOccurrence }
+- update_shape: { id, label?, type?, x?, y?, width?, height? }
+- update_arrow: { id, label?, type?, from?, to? }
+- delete_element: { id } — works for a shape or an arrow; deleting a shape also removes arrows connected to it.
+- group_shapes: { shapeIds: [...], label } — draws a dashed container around the given shapes.
+- auto_layout: { shapeIds? } — rearranges shapes left-to-right by causal/temporal/conditional flow; omit shapeIds to lay out everything.
+
+The current shapes and arrows with their exact ids are listed below — use
+those exact ids for anything that already exists, don't invent new ones.
+
+Referencing a shape you're creating in the same response: give that
+add_shape action a "tempId" (any short string you make up, like "a" or
+"new1"), then use that same string in place of a real id anywhere later
+in the SAME actions array — add_arrow's from/to, group_shapes' shapeIds,
+etc. It gets resolved to the real id automatically once the shape is
+created. This is how you connect brand-new shapes with arrows in one
+response instead of guessing an id that doesn't exist yet.
+
+Do not use any other calling convention. In particular, never write
+literal tags like <function_calls>, <invoke name="...">, or <parameter
+name="...">value</parameter> — that's a different system's syntax, not
+this one, and this chat has no idea what to do with it. There is no tool
+list you're calling into; there is only the JSON object described above.
+If you catch yourself reaching for anything that looks like a function
+call in angle brackets, stop and write the JSON object instead.`;
+
+function buildStateSummary(){
+  if(!state.shapes.length && !state.arrows.length) return 'The diagram is currently empty — nothing has been drawn yet.';
+  var shapeLines = state.shapes.map(function(s){
+    return '  ' + s.id + ' [' + s.type + '] "' + s.label + '" at (' + Math.round(s.x) + ',' + Math.round(s.y) + ') size ' + Math.round(s.w) + 'x' + Math.round(s.h);
+  }).join('\n');
+  var arrowLines = state.arrows.map(function(a){
+    return '  ' + a.id + ': ' + a.from + ' -> ' + a.to + ' [' + a.type + '] "' + a.label + '"';
+  }).join('\n');
+  return 'Shapes:\n' + (shapeLines || '  (none)') + '\nArrows:\n' + (arrowLines || '  (none)');
+}
+
+function theaSystemPrompt(){
+  return THEA_SYSTEM + '\n\n---\n(For your awareness only — the diagram currently has ' + state.shapes.length + ' shape(s) and ' + state.arrows.length + ' arrow(s). Only mention this if the researcher brings up the figure itself; Drew is the one who draws it.)';
+}
+function drewSystemPrompt(){
+  return DREW_SYSTEM_BASE + '\n\n---\nCurrent diagram state:\n' + buildStateSummary();
+}
+
+/* ============================================================
+   AVATARS
+   ============================================================ */
+var THEA_ICON = '<path d="M9 21h6"/><path d="M10 18h4"/><path d="M12 3a6.5 6.5 0 0 0-3.8 11.8c.6.45 1 1.1 1 1.9V17h5.6v-.3c0-.8.4-1.45 1-1.9A6.5 6.5 0 0 0 12 3z"/>';
+var DREW_ICON = '<path d="M12 3C6.5 3 3 6.6 3 11.2c0 3.9 2.8 6.4 5.7 5.9.9-.15 1.7.5 1.4 1.3-.4 1.1.5 2.3 1.7 2.1C17.8 19.8 21 15.9 21 11.2 21 6.6 17.5 3 12 3z"/><circle cx="8" cy="10" r="1.1" fill="white" stroke="none"/><circle cx="12" cy="7.3" r="1.1" fill="white" stroke="none"/><circle cx="16" cy="10" r="1.1" fill="white" stroke="none"/>';
+function avatarHTML(persona){
+  var icon = persona==='thea' ? THEA_ICON : DREW_ICON;
+  return '<div class="avatar avatar-' + persona + '"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + icon + '</svg></div>';
+}
+
+/* ============================================================
+   CHAT  (one shared conversation history for both personas —
+   Thea and Drew each see the whole thread, including the other's
+   turns and tool calls, so they stay genuinely aware of each other)
+   ============================================================ */
+var lastPersona = 'thea'; // who to show in the typing indicator
+var conv = [];       // shared API message history
+var chatLog = [];    // shared display log
+var isSending = false;
+
+function pushLog(entry){ chatLog.push(entry); renderChatFeed(); }
+
+function pushAssistant(persona, text){
+  chatLog.push({ type:'assistant', persona:persona, text:text });
+  renderChatFeed();
+  speak(text);
+}
+
+function setSending(persona, v){
+  isSending = v;
+  lastPersona = persona;
+  document.getElementById('sendTheaBtn').disabled = v;
+  document.getElementById('sendDrewBtn').disabled = v;
+  renderChatFeed();
+}
+
+async function callClaude(persona, userText){
+  conv.push({ role:'user', content:userText });
+  pushLog({ type:'user', text:userText });
+  setSending(persona, true);
+  try{
+    var body = {
+      model:'claude-sonnet-4-6',
+      max_tokens:1000,
+      system: persona==='thea' ? theaSystemPrompt() : drewSystemPrompt(),
+      messages: conv
+    };
+    var res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(body)
+    });
+    var data = await res.json();
+    if(!res.ok || data.type==='error'){
+      throw new Error((data.error && data.error.message) || ('Request failed (' + res.status + ')'));
+    }
+    var content = data.content || [];
+    conv.push({ role:'assistant', content:content });
+    var text = content.filter(function(b){ return b.type==='text'; }).map(function(b){ return b.text; }).join('\n').trim();
+
+    if(persona==='thea'){
+      if(text) pushAssistant('thea', text);
+    } else {
+      var parsed = parseDrewResponse(text);
+      if(parsed.message) pushAssistant('drew', parsed.message);
+      if(parsed.actions.length){
+        var run = runDrewActions(parsed.actions);
+        run.results.forEach(function(r){
+          pushLog({ type:'tool', text: toolNote(r.tool, r.input, r.result) });
+        });
+        if(run.diagramChanged){
+          var snapshot = { shapes: JSON.parse(JSON.stringify(state.shapes)), arrows: JSON.parse(JSON.stringify(state.arrows)) };
+          pushLog({ type:'diagram', shapes: snapshot.shapes, arrows: snapshot.arrows });
+        }
+      }
+    }
+  } catch(err){
+    pushLog({ type:'error', text:'Trouble reaching Claude: ' + err.message });
+  } finally {
+    setSending(persona, false);
+  }
+}
+
+function smallBtn(label, onClick){
+  var b = document.createElement('button');
+  b.className = 'tbtn';
+  b.type = 'button';
+  b.textContent = label;
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+function buildDiagramCardEl(entry){
+  var card = document.createElement('div');
+  card.className = 'diagram-card';
+  var built = buildExportSVG(entry.shapes, entry.arrows);
+  card.appendChild(built.svg);
+  var legend = document.createElement('div');
+  legend.className = 'diagram-legend';
+  legend.innerHTML = LEGEND_HTML;
+  card.appendChild(legend);
+  var footer = document.createElement('div');
+  footer.className = 'diagram-card-footer';
+  var stats = document.createElement('span');
+  stats.className = 'diagram-card-stats';
+  stats.textContent = entry.shapes.length + ' shape' + (entry.shapes.length===1?'':'s') + ' \u00b7 ' + entry.arrows.length + ' arrow' + (entry.arrows.length===1?'':'s');
+  footer.appendChild(stats);
+  var exportsWrap = document.createElement('div');
+  exportsWrap.className = 'diagram-card-exports';
+  exportsWrap.appendChild(smallBtn('SVG', function(){ exportSVG(entry.shapes, entry.arrows); }));
+  exportsWrap.appendChild(smallBtn('PNG', function(){ exportPNG(entry.shapes, entry.arrows); }));
+  exportsWrap.appendChild(smallBtn('PPTX', function(){ exportPPTX(entry.shapes, entry.arrows); }));
+  footer.appendChild(exportsWrap);
+  card.appendChild(footer);
+  return card;
+}
+
+function renderChatFeed(){
+  var el = document.getElementById('chatFeedInner');
+  el.innerHTML = '';
+  if(!chatLog.length){
+    var hint = document.createElement('div');
+    hint.className = 'empty-hint';
+    hint.textContent = 'Loading…';
+    el.appendChild(hint);
+  }
+  chatLog.forEach(function(e){
+    if(e.type==='tool'){
+      var t = document.createElement('div');
+      t.className = 'tool-note';
+      t.textContent = e.text;
+      el.appendChild(t);
+      return;
+    }
+    if(e.type==='diagram'){
+      el.appendChild(buildDiagramCardEl(e));
+      return;
+    }
+    var row = document.createElement('div');
+    row.className = 'msg-row ' + (e.type==='user' ? 'user' : e.type==='error' ? 'error' : 'assistant ' + e.persona);
+    if(e.type==='assistant') row.insertAdjacentHTML('beforeend', avatarHTML(e.persona));
+    var bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    if(e.type==='assistant'){
+      var nm = document.createElement('span');
+      nm.className = 'persona-name';
+      nm.textContent = e.persona==='thea' ? 'Thea' : 'Drew';
+      bubble.appendChild(nm);
+    }
+    var body = document.createElement('span');
+    body.textContent = e.text;
+    bubble.appendChild(body);
+    row.appendChild(bubble);
+    el.appendChild(row);
+  });
+  if(isSending){
+    var trow = document.createElement('div');
+    trow.className = 'msg-row assistant ' + lastPersona;
+    trow.insertAdjacentHTML('beforeend', avatarHTML(lastPersona));
+    var tbubble = document.createElement('div');
+    tbubble.className = 'bubble';
+    tbubble.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>';
+    trow.appendChild(tbubble);
+    el.appendChild(trow);
+  }
+  var feed = document.getElementById('chatFeed');
+  feed.scrollTop = feed.scrollHeight;
+}
+
+var DEFAULT_MSG = {
+  thea: "Let's keep going.",
+  drew: "Go ahead and draw this based on what we've discussed so far."
+};
+
+function updateNudge(justSent){
+  var nudge = document.getElementById('composerNudge');
+  nudge.textContent = justSent==='thea'
+    ? 'Keep thinking with Thea, or have Drew draw it?'
+    : 'Keep drawing with Drew, or think it through with Thea?';
+}
+
+function sendTo(persona){
+  if(isSending) return;
+  var ta = document.getElementById('composerInput');
+  var text = ta.value.trim() || DEFAULT_MSG[persona];
+  ta.value = '';
+  ta.style.height = '38px';
+  updateNudge(persona);
+  callClaude(persona, text);
+}
+document.getElementById('sendTheaBtn').addEventListener('click', function(){ sendTo('thea'); });
+document.getElementById('sendDrewBtn').addEventListener('click', function(){ sendTo('drew'); });
+
+document.getElementById('composerInput').addEventListener('keydown', function(e){
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendTo(lastPersona); }
+});
+document.getElementById('composerInput').addEventListener('input', function(){
+  this.style.height = '38px';
+  this.style.height = Math.min(120, this.scrollHeight) + 'px';
+});
+
+/* ============================================================
+   SCREEN FLOW: consent -> intake -> workspace
+   ============================================================ */
+function showScreen(name){
+  document.getElementById('screen-consent').classList.toggle('hidden', name!=='consent');
+  document.getElementById('screen-intake').classList.toggle('hidden', name!=='intake');
+  document.getElementById('screen-workspace').classList.toggle('hidden', name!=='workspace');
+}
+
+document.getElementById('consentCheck').addEventListener('change', function(){
+  document.getElementById('consentContinue').disabled = !this.checked;
+});
+document.getElementById('consentContinue').addEventListener('click', function(){
+  showScreen('intake');
+});
+
+var intakeFactors = [];
+
+function renderFactorChips(){
+  var wrap = document.getElementById('intakeFactorList');
+  wrap.innerHTML = '';
+  intakeFactors.forEach(function(f, i){
+    var chip = document.createElement('span');
+    chip.className = 'chip';
+    var label = document.createElement('span');
+    label.textContent = f;
+    chip.appendChild(label);
+    var rm = document.createElement('button');
+    rm.type = 'button';
+    rm.textContent = '\u00d7';
+    rm.title = 'Remove';
+    rm.addEventListener('click', function(){ intakeFactors.splice(i,1); renderFactorChips(); });
+    chip.appendChild(rm);
+    wrap.appendChild(chip);
+  });
+}
+function addFactorFromInput(){
+  var input = document.getElementById('intakeFactorInput');
+  var v = input.value.trim();
+  if(!v) return;
+  intakeFactors.push(v);
+  input.value = '';
+  renderFactorChips();
+  input.focus();
+}
+document.getElementById('intakeFactorAdd').addEventListener('click', addFactorFromInput);
+document.getElementById('intakeFactorInput').addEventListener('keydown', function(e){
+  if(e.key==='Enter'){ e.preventDefault(); addFactorFromInput(); }
+});
+document.getElementById('intakeOutcomeUnsure').addEventListener('change', function(){
+  document.getElementById('intakeOutcome').disabled = this.checked;
+});
+document.getElementById('intakeFactorsUnsure').addEventListener('change', function(){
+  document.getElementById('intakeFactorInput').disabled = this.checked;
+  document.getElementById('intakeFactorAdd').disabled = this.checked;
+});
+Array.prototype.forEach.call(document.querySelectorAll('#intakeModelType input[type=radio]'), function(r){
+  r.addEventListener('change', function(){
+    document.getElementById('intakeModelOther').disabled = (document.querySelector('#intakeModelType input[value="other"]').checked !== true);
+  });
+});
+
+function intakeModelLabel(data){
+  var labels = { variance:'Variance-based', process:'Process-based', sequential:'Sequential', unsure:'Not sure' };
+  if(data.modelType==='other') return data.modelOther || 'Something else';
+  return labels[data.modelType] || 'Not sure';
+}
+function outcomeDisplay(data){ return data.outcomeUnsure ? 'Not sure' : data.outcome; }
+function factorsDisplay(data){
+  if(data.factorsUnsure) return 'Not sure';
+  return data.factors.length ? data.factors.join(', ') : '\u2014';
+}
+function escapeHtml(s){
+  return String(s==null ? '' : s).replace(/[&<>"']/g, function(c){
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+  });
+}
+
+document.getElementById('intakeContinue').addEventListener('click', function(){
+  var outcomeUnsure = document.getElementById('intakeOutcomeUnsure').checked;
+  var outcome = document.getElementById('intakeOutcome').value.trim();
+  if(!outcome && !outcomeUnsure){
+    document.getElementById('intakeOutcome').focus();
+    document.getElementById('intakeOutcome').style.borderColor = 'var(--danger)';
+    return;
+  }
+  var factorsUnsure = document.getElementById('intakeFactorsUnsure').checked;
+  var modelType = 'unsure';
+  var radios = document.querySelectorAll('#intakeModelType input[type=radio]');
+  Array.prototype.forEach.call(radios, function(r){ if(r.checked) modelType = r.value; });
+  var modelOther = document.getElementById('intakeModelOther').value.trim();
+  var extra = document.getElementById('intakeExtra').value.trim();
+
+  var intakeData = {
+    outcome: outcome, outcomeUnsure: outcomeUnsure,
+    factors: intakeFactors.slice(), factorsUnsure: factorsUnsure,
+    modelType: modelType, modelOther: modelOther, extra: extra
+  };
+
+  showScreen('workspace');
+  updateNudge('thea');
+
+  pushLog({ type:'tool', text:
+    'Outcome: ' + outcomeDisplay(intakeData) + '  \u00b7  Explaining: ' + factorsDisplay(intakeData) + '  \u00b7  Model: ' + intakeModelLabel(intakeData)
+  });
+
+  var summary = 'Outcome: ' + outcomeDisplay(intakeData) + '.\n' +
+    'What I think is explaining it: ' + factorsDisplay(intakeData) + '.\n' +
+    "What sort of model I'm picturing: " + intakeModelLabel(intakeData) + '.';
+  if(extra) summary += '\nAnything else worth knowing: ' + extra;
+  callClaude('thea', summary);
+});
+
+/* ============================================================
+   VOICE MODE (speech synthesis + dictation)
+   ============================================================ */
+var voiceEnabled = false;
+var synthAvailable = ('speechSynthesis' in window);
+var RecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+var currentUtterance = null; // kept in scope deliberately — some browsers drop
+                              // speech mid-flight if the utterance is garbage
+                              // collected before it finishes
+
+function speak(text){
+  if(!voiceEnabled || !synthAvailable || !text) return;
+  try{
+    window.speechSynthesis.cancel();
+    currentUtterance = new SpeechSynthesisUtterance(text);
+    currentUtterance.rate = 1;
+    window.speechSynthesis.speak(currentUtterance);
+  } catch(e){ /* best-effort only */ }
+}
+
+var voiceBtn = document.getElementById('voiceToggle');
+var voiceLabel = document.getElementById('voiceToggleLabel');
+if(!synthAvailable && !RecognitionCtor){
+  voiceBtn.disabled = true;
+  voiceBtn.title = "Voice isn't supported in this browser.";
+}
+voiceBtn.addEventListener('click', function(){
+  voiceEnabled = !voiceEnabled;
+  voiceBtn.setAttribute('aria-pressed', String(voiceEnabled));
+  voiceLabel.textContent = voiceEnabled ? 'Voice on' : 'Voice off';
+  var micBtn = document.getElementById('micBtn');
+  var showMic = voiceEnabled && !!RecognitionCtor;
+  micBtn.classList.toggle('hidden', !showMic);
+  if(voiceEnabled && synthAvailable){
+    // Speak a near-silent utterance directly inside this click handler —
+    // a real user gesture — so the browser treats speech synthesis as
+    // "unlocked" for the async replies that will trigger it moments later.
+    try{
+      var primer = new SpeechSynthesisUtterance(' ');
+      primer.volume = 0;
+      window.speechSynthesis.speak(primer);
+    } catch(e){ /* best-effort only */ }
+  }
+  if(!voiceEnabled){
+    if(synthAvailable) window.speechSynthesis.cancel();
+    document.getElementById('composerMicStatus').textContent = '';
+  }
+});
+
+// Wires a mic button to dictation into a target field, with visible error
+// feedback — since we can't grant microphone permission to this page from
+// inside its own JS (that's controlled by whatever embeds it), the most we
+// can do on failure is tell the person clearly instead of failing silently.
+function attachDictation(btnEl, targetEl, statusEl, alwaysShow){
+  if(!RecognitionCtor){
+    btnEl.classList.add('hidden');
+    return;
+  }
+  if(alwaysShow) btnEl.classList.remove('hidden');
+  var rec;
+  try{ rec = new RecognitionCtor(); }
+  catch(e){ btnEl.classList.add('hidden'); return; }
+  rec.continuous = false;
+  rec.interimResults = false;
+  rec.lang = 'en-US';
+  var active = false;
+  function setStatus(msg){ if(statusEl) statusEl.textContent = msg || ''; }
+  rec.onstart = function(){ setStatus('Listening\u2026'); };
+  rec.onresult = function(e){
+    var t = e.results[0][0].transcript;
+    targetEl.value = (targetEl.value ? targetEl.value + ' ' : '') + t;
+    targetEl.dispatchEvent(new Event('input'));
+    setStatus('');
+  };
+  rec.onerror = function(e){
+    active = false;
+    btnEl.setAttribute('data-recording', 'false');
+    var reason = e && e.error;
+    if(reason==='not-allowed' || reason==='service-not-allowed'){
+      setStatus("Microphone access isn't available here \u2014 you can still type.");
+    } else if(reason==='no-speech'){
+      setStatus("Didn't catch that \u2014 try again.");
+    } else {
+      setStatus("Voice input isn't working right now \u2014 you can still type.");
+    }
+  };
+  rec.onend = function(){ active = false; btnEl.setAttribute('data-recording', 'false'); };
+  btnEl.addEventListener('click', function(){
+    if(active){ rec.stop(); return; }
+    if(location.protocol!=='https:' && location.hostname!=='localhost'){
+      setStatus('Voice input needs a secure (https) connection.');
+      return;
+    }
+    setStatus('');
+    try{
+      rec.start();
+      active = true;
+      btnEl.setAttribute('data-recording', 'true');
+    } catch(e){
+      active = false;
+      btnEl.setAttribute('data-recording', 'false');
+      setStatus("Couldn't start listening \u2014 you can still type.");
+    }
+  });
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+function init(){
+  attachDictation(document.getElementById('intakeExtraMic'), document.getElementById('intakeExtra'), document.getElementById('intakeExtraMicStatus'), true);
+  attachDictation(document.getElementById('micBtn'), document.getElementById('composerInput'), document.getElementById('composerMicStatus'), false);
+  showScreen('consent');
+}
+init();
+
+})();
+</script>
+</body>
+</html>
