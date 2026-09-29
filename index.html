@@ -2,9 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Figure Creation Agent — conceptual figure builder</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgenjs.bundle.min.js"></script>
+<!-- pptxgenjs is loaded on demand from loadPptxLib() on first PPTX export,
+     not here -- a script tag at page load either succeeds once or leaves
+     PPTX export permanently broken for the rest of the session if that one
+     request has a hiccup. See loadPptxLib / buildAndSavePptx below. -->
 <style>
   :root{
     --paper:#F7F5F0;
@@ -26,7 +29,10 @@
     --font-display:"Iowan Old Style","Palatino Linotype",Palatino,"Source Serif 4",Georgia,serif;
     --font-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
     --font-mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+  html{ scroll-padding-top: env(safe-area-inset-top, 0px); }
   *{box-sizing:border-box;}
   html,body{height:100%; margin:0; overflow:hidden;}
   body{
@@ -194,6 +200,9 @@
   .diagram-legend{ display:flex; flex-wrap:wrap; gap:7px 12px; padding:7px 12px; border-top:1px solid var(--rule); font-size:10px; color:var(--ink-faint); }
   .diagram-legend span{ display:inline-flex; align-items:center; gap:4px; }
   .diagram-legend svg{ width:20px; height:8px; flex:none; }
+  .diagram-card-status{ display:none; padding:6px 12px; font-size:11px; color:var(--ink-soft); border-top:1px solid var(--rule); }
+  .diagram-card-status.is-visible{ display:block; }
+  .diagram-card-status.is-error{ color:var(--danger); background:var(--danger-bg); }
   .diagram-card-footer{
     display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px;
     border-top:1px solid var(--rule); background:var(--paper); flex-wrap:wrap;
@@ -454,21 +463,72 @@ var measureCtx = measureCanvas.getContext('2d');
 
 function wrapLabel(text, maxWidth, font){
   measureCtx.font = font;
-  var words = (text || '').split(/\s+/).filter(Boolean);
-  if(!words.length) return [''];
+  var raw = (text || '').trim();
+  if(!raw) return [''];
+  // Tokenize into pieces, each tagged with whether it needs a leading
+  // space when appended onto the same line as the piece before it.
+  // Splits on whitespace as usual (space needed on join), and ALSO
+  // right after a slash or hyphen inside an otherwise-unbreakable long
+  // word (glued, no space needed) -- so a compound like "swap/split"
+  // can still wrap onto a new line between its halves when there's no
+  // room for the whole thing on a short arrow, without ever displaying
+  // an extra space when there's room for it to stay whole.
+  var rawPieces = raw.split(/(\s+)/);
+  var pieces = [];
+  var needSpace = false;
+  rawPieces.forEach(function(p){
+    if(p === '') return;
+    if(/^\s+$/.test(p)){ needSpace = true; return; }
+    var subs = p.split(/(?<=[\/-])/).filter(Boolean);
+    subs.forEach(function(s, i){
+      pieces.push({ text:s, space: i===0 ? needSpace : false });
+    });
+    needSpace = false;
+  });
+  if(!pieces.length) return [''];
+
   var lines = [];
-  var cur = words[0];
-  for(var i=1;i<words.length;i++){
-    var test = cur + ' ' + words[i];
+  var cur = pieces[0].text;
+  for(var i=1;i<pieces.length;i++){
+    var piece = pieces[i];
+    var test = cur + (piece.space ? ' ' : '') + piece.text;
     if(measureCtx.measureText(test).width <= maxWidth){
       cur = test;
     } else {
       lines.push(cur);
-      cur = words[i];
+      cur = piece.text;
     }
   }
   lines.push(cur);
   return lines;
+}
+
+// Plain greedy-fill wrapping (above) packs each line as full as it can
+// before breaking, which often leaves a short, lopsided last line (e.g.
+// three words then one word alone). That's still mathematically centered
+// -- every line shares the same anchor x -- but a very uneven line looks
+// off-center to the eye, since a short trailing line reads as "shifted"
+// rather than "balanced" under the line above it. This narrows the
+// working width to the smallest value that still produces the SAME
+// number of lines as the original (found by binary search), which
+// redistributes words more evenly across those lines without ever
+// wrapping to more lines than the plain version would.
+function wrapLabelBalanced(text, maxWidth, font){
+  var base = wrapLabel(text, maxWidth, font);
+  if(base.length <= 1) return base;
+  measureCtx.font = font;
+  var widest = 0;
+  (text||'').split(/\s+/).forEach(function(w){
+    var wid = measureCtx.measureText(w).width;
+    if(wid > widest) widest = wid;
+  });
+  var lo = Math.max(widest, 1), hi = maxWidth;
+  for(var i=0;i<12 && hi-lo>1;i++){
+    var mid = (lo+hi)/2;
+    var trial = wrapLabel(text, mid, font);
+    if(trial.length <= base.length){ hi = mid; } else { lo = mid; }
+  }
+  return wrapLabel(text, hi, font);
 }
 
 function defaultSize(type, label){
@@ -547,6 +607,102 @@ function computeEdgePoints(fromShape, toShape){
   var p1 = boundaryFor(fromShape, toC.x, toC.y);
   var p2 = boundaryFor(toShape, fromC.x, fromC.y);
   return { x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y };
+}
+
+// An arrow label centered ON the line (the original behavior, in every
+// format) covers whatever dash pattern sits directly beneath it -- fine
+// for a short label on a long line, but a wrapped multi-line label can
+// blot out most of a short arrow, hiding exactly the detail (solid vs.
+// dashed vs. dotted) the legend exists to explain. This offsets the
+// label's CENTER a fixed distance to one side of the line -- the line
+// itself is untouched and drawn full length -- so the label floats
+// beside the arrow rather than on top of it. Picks whichever of the two
+// perpendicular directions points up-screen (or left, for an already-
+// horizontal line), so labels land in a consistent, predictable spot
+// rather than alternating sides arrow to arrow.
+// Returns a text-safe rotation angle (degrees) for a line -- normalized
+// so a rotated label never reads upside down -- plus whether the line is
+// close enough to horizontal/vertical that rotating wouldn't help
+// legibility (a label on a near-axis-aligned arrow stays upright and
+// offset to the side instead; see labelOffsetFromLine).
+function lineLabelAngle(x1, y1, x2, y2){
+  // Normalized so a rotated label never reads upside down, regardless of
+  // which direction the arrow points. Every arrow's label rotates to
+  // match this angle -- no exemption for near-vertical ones -- so the
+  // treatment is genuinely the same for every arrow, not "usually
+  // rotated, except sometimes."
+  var deg = Math.atan2(y2-y1, x2-x1) * 180/Math.PI;
+  if(deg > 90) deg -= 180;
+  if(deg < -90) deg += 180;
+  return { deg: deg };
+}
+
+function labelOffsetFromLine(x1, y1, x2, y2, dist){
+  var dx = x2 - x1, dy = y2 - y1;
+  var len = Math.sqrt(dx*dx + dy*dy) || 1;
+  var ux = dx/len, uy = dy/len;
+  var px = -uy, py = ux;
+  if(py > 0){ px = -px; py = -py; }
+  return { x: px*dist, y: py*dist };
+}
+
+// Offsetting perpendicular to the line only helps when there's actually
+// room in that direction -- if another shape happens to sit right where
+// "above this arrow" lands (common when one arrow passes close beneath
+// an unrelated box), pushing the label further out moves it TOWARD that
+// shape, not away, and no fixed gap can satisfy both "clear of the line"
+// and "clear of the shape" when the physical space between them is
+// narrower than the label itself. So instead of always anchoring at the
+// line's exact midpoint, this tries a few points along the arrow's own
+// length and picks whichever one lands the label's rotated bounding box
+// fully clear of every OTHER shape (excluding the arrow's own two
+// endpoints, which it's expected to sit near) -- falling back to the
+// midpoint, unchanged from before, when nothing tried is fully clear.
+function pickLabelAnchor(shapes, fromId, toId, x1, y1, x2, y2, lw, lh2, offsetDist, rotateDeg){
+  var rad = rotateDeg * Math.PI/180;
+  var cosT = Math.cos(rad), sinT = Math.sin(rad);
+  var hw = lw/2, hh = lh2/2;
+  var corners = [[hw,-hh],[hw,hh],[-hw,-hh],[-hw,hh]];
+  var off = labelOffsetFromLine(x1, y1, x2, y2, offsetDist);
+  var candidates = [0.5, 0.35, 0.65, 0.2, 0.8];
+  var fallback = null;
+  for(var i=0;i<candidates.length;i++){
+    var t = candidates[i];
+    var mx = x1 + (x2-x1)*t + off.x, my = y1 + (y2-y1)*t + off.y;
+    var minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+    for(var c=0;c<corners.length;c++){
+      var rx = corners[c][0]*cosT - corners[c][1]*sinT, ry = corners[c][0]*sinT + corners[c][1]*cosT;
+      var cx = mx+rx, cy = my+ry;
+      if(cx<minX) minX=cx; if(cx>maxX) maxX=cx; if(cy<minY) minY=cy; if(cy>maxY) maxY=cy;
+    }
+    var collides = shapes.some(function(s){
+      // Group containers are unfilled dashed outlines, not solid shapes --
+      // a label sitting inside one doesn't visually hide anything the way
+      // sitting inside an opaque box does, so treating them as collision
+      // obstacles here only pushes the search away from otherwise-fine
+      // positions (including, in one real case, away from the exact
+      // midpoint that had no actual overlap with anything once the group
+      // stopped being counted).
+      // Group containers are unfilled dashed outlines, not solid shapes --
+      // a label sitting inside one doesn't visually hide anything the way
+      // sitting inside an opaque box does, so treating them as collision
+      // obstacles here only pushes the search away from otherwise-fine
+      // positions. Endpoint shapes ARE checked (no exclusion for the
+      // arrow's own from/to) -- a rotated label's corners can swing well
+      // beyond its own half-height into whichever shape is nearby,
+      // including its own endpoint, and excluding them only meant that
+      // exact case was never even attempted to be avoided. Verified this
+      // adds no regressions: every previously-fixed case picks the same
+      // anchor whether or not endpoints are checked, since a normal label
+      // already clears them; the difference only shows up in genuine
+      // overlap cases, where it now actually avoids them.
+      if(s.type==='group') return false;
+      return !(maxX < s.x || minX > s.x+s.w || maxY < s.y || minY > s.y+s.h);
+    });
+    if(i===0) fallback = { x:mx, y:my };
+    if(!collides) return { x:mx, y:my };
+  }
+  return fallback;
 }
 
 var ARROW_STYLE = {
@@ -655,17 +811,35 @@ function renderArrows(snap){
     });
     g.appendChild(line);
     if(a.label){
-      var mx=(pts.x1+pts.x2)/2, my=(pts.y1+pts.y2)/2;
+      var dx = pts.x2-pts.x1, dy = pts.y2-pts.y1;
+      var lineLen = Math.sqrt(dx*dx + dy*dy) || 1;
       var font = 'italic 11px -apple-system, sans-serif';
-      var alines = wrapLabel(a.label, 140, font);
+      var angleInfo = lineLabelAngle(pts.x1, pts.y1, pts.x2, pts.y2);
+
+      // The label always sits OFFSET above the line -- never centered on
+      // top of it -- and always rotates to match the line's own angle, no
+      // exemptions for near-vertical arrows -- one rule for every arrow,
+      // not "usually rotated, except sometimes." The rotated text's long
+      // axis runs parallel to the line regardless of that line's own
+      // direction, so the wrap width is always constrained by how long
+      // the arrow actually is (see wrapLabel above): a short arrow
+      // correctly forces a narrower, taller wrap.
+      var maxLabelWidth = Math.min(140, Math.max(46, lineLen*0.85));
+      var alines = wrapLabelBalanced(a.label, maxLabelWidth, font);
       measureCtx.font = font;
       var lw = Math.max.apply(null, alines.map(function(l){ return measureCtx.measureText(l).width; })) + 8;
       var lh2 = alines.length*13 + 4;
+      var anchor = pickLabelAnchor(snap.shapes, a.from, a.to, pts.x1, pts.y1, pts.x2, pts.y2, lw, lh2, lh2/2 + 4, angleInfo.deg);
+      var mx = anchor.x, my = anchor.y;
+      var rotateDeg = angleInfo.deg;
+
+      var labelGroup = svgEl('g', rotateDeg ? { transform:'rotate(' + rotateDeg.toFixed(2) + ' ' + mx.toFixed(2) + ' ' + my.toFixed(2) + ')' } : {});
       var bg = svgEl('rect', { x:mx-lw/2, y:my-lh2/2, width:lw, height:lh2, class:'arrow-label-bg' });
-      g.appendChild(bg);
+      labelGroup.appendChild(bg);
       var lt = svgEl('text', { class:'arrow-label', 'text-anchor':'middle', 'dominant-baseline':'middle' });
       renderTspans(lt, alines, mx, my);
-      g.appendChild(lt);
+      labelGroup.appendChild(lt);
+      g.appendChild(labelGroup);
     }
     layer.appendChild(g);
   });
@@ -693,44 +867,167 @@ var EXPORT_CSS =
   '.shape-label{font-family:Georgia,serif;fill:#1C1B18;font-size:12.5px;}' +
   '.group-label{font-family:Consolas,monospace;fill:#8A8676;font-size:10.5px;letter-spacing:0.04em;}' +
   '.arrow-line{fill:none;stroke:#1C1B18;stroke-width:1.6;}' +
-  '.arrow-label-bg{fill:#F7F5F0;opacity:0.92;}' +
-  '.arrow-label{font-family:Georgia,serif;font-style:italic;font-size:11px;fill:#5B584E;}';
+  '.arrow-label-bg{fill:#FFFFFF;}' +
+  '.arrow-label{font-family:Georgia,serif;font-style:italic;font-size:11px;fill:#5B584E;}' +
+  '.legend-line{fill:none;stroke:#1C1B18;stroke-width:1.6;}' +
+  '.legend-label{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:10px;fill:#95917F;}' +
+  '.legend-rule{stroke:#DAD5C7;stroke-width:1;}';
 
-function buildExportSVG(shapes, arrows){
+// Same five arrow kinds as the on-screen legend (LEGEND_HTML), but built
+// from ARROW_STYLE directly so the exported key can never drift out of
+// sync with how the arrows are actually drawn.
+var LEGEND_ITEMS = [
+  { type:'causal',       label:'causal' },
+  { type:'temporal',     label:'temporal' },
+  { type:'conditional',  label:'conditional' },
+  { type:'feedback',     label:'feedback' },
+  { type:'coOccurrence', label:'co-occurs' }
+];
+
+// Lays the legend out left to right starting at (originX, originY) and
+// returns the group plus how wide it ended up, so the caller can widen
+// the export canvas if the legend is wider than the diagram itself.
+function buildLegendSVGGroup(originX, originY){
+  var g = svgEl('g', { class:'export-legend' });
+  var font = '10px -apple-system, sans-serif';
+  measureCtx.font = font;
+  var lineW = 26, gapAfterLine = 6, itemGap = 20;
+  var x = originX;
+  LEGEND_ITEMS.forEach(function(item){
+    var style = ARROW_STYLE[item.type] || ARROW_STYLE.causal;
+    var line = svgEl('line', {
+      x1:x, y1:originY, x2:x+lineW, y2:originY, class:'legend-line',
+      'stroke-dasharray': style.dasharray, 'marker-end': style.markerEnd, 'marker-start': style.markerStart
+    });
+    g.appendChild(line);
+    var label = svgEl('text', { x:x+lineW+gapAfterLine, y:originY, class:'legend-label', 'dominant-baseline':'middle' });
+    label.textContent = item.label;
+    g.appendChild(label);
+    x += lineW + gapAfterLine + measureCtx.measureText(item.label).width + itemGap;
+  });
+  return { group:g, width: x - itemGap - originX };
+}
+
+function buildExportSVG(shapes, arrows, includeLegend){
+  if(includeLegend === undefined) includeLegend = true;
   var snap = { shapes: shapes, arrows: arrows };
   renderToStage(snap);
   var bbox = computeContentBBox(shapes);
+
+  var legendPad = includeLegend ? 16 : 0, legendBandH = includeLegend ? 22 : 0;
+  var legendResult = includeLegend
+    ? buildLegendSVGGroup(bbox.x, bbox.y + bbox.h + legendPad + legendBandH/2)
+    : { group:null, width:0 };
+  var totalW = Math.max(bbox.w, legendResult.width);
+  var totalH = bbox.h + legendPad + legendBandH;
+
   var clone = stage.cloneNode(true);
   clone.removeAttribute('style');
   clone.removeAttribute('id');
-  Array.prototype.forEach.call(clone.querySelectorAll('[id]'), function(el){ el.removeAttribute('id'); });
-  clone.setAttribute('viewBox', bbox.x + ' ' + bbox.y + ' ' + bbox.w + ' ' + bbox.h);
-  clone.setAttribute('width', Math.round(bbox.w));
-  clone.setAttribute('height', Math.round(bbox.h));
-  var bgRect = svgEl('rect', { x:bbox.x, y:bbox.y, width:bbox.w, height:bbox.h, fill:'#FFFFFF' });
+  // Only strip ids OUTSIDE <defs> -- the marker ids in there (mk-tri,
+  // mk-open, mk-dot) are what every arrow's marker-end="url(#mk-...)"
+  // resolves against. Stripping those silently drops every arrowhead
+  // from the exported file while leaving the line itself, so it never
+  // throws or shows an error -- it just quietly loses the causal vs.
+  // temporal vs. co-occurs distinction the legend is there to explain.
+  Array.prototype.forEach.call(clone.querySelectorAll('[id]'), function(el){
+    if(!el.closest('defs')) el.removeAttribute('id');
+  });
+  clone.setAttribute('viewBox', bbox.x + ' ' + bbox.y + ' ' + totalW + ' ' + totalH);
+  clone.setAttribute('width', Math.round(totalW));
+  clone.setAttribute('height', Math.round(totalH));
+  var bgRect = svgEl('rect', { x:bbox.x, y:bbox.y, width:totalW, height:totalH, fill:'#FFFFFF' });
   var style = document.createElementNS(SVGNS, 'style');
   style.textContent = EXPORT_CSS;
   clone.insertBefore(style, clone.firstChild);
   clone.insertBefore(bgRect, clone.firstChild.nextSibling);
-  return { svg: clone, bbox: bbox };
+  if(includeLegend){
+    var rule = svgEl('line', {
+      x1:bbox.x, y1:bbox.y+bbox.h+legendPad/2, x2:bbox.x+totalW, y2:bbox.y+bbox.h+legendPad/2, class:'legend-rule'
+    });
+    clone.appendChild(rule);
+    clone.appendChild(legendResult.group);
+  }
+  return { svg: clone, bbox: { x:bbox.x, y:bbox.y, w:totalW, h:totalH } };
 }
 
-function downloadBlob(content, filename, type){
-  var blob = new Blob([content], { type: type });
+// A published page can't hand the viewer a file via a plain <a download>
+// click or a script-started save -- that's inert once actually published
+// (it only ever worked in the chat's own artifact preview). Saving a file
+// here is a runtime capability instead; resolved once at load, same
+// pattern as sampleFn above.
+var downloadsFn = null;
+(async function initDownloads(){
+  try{
+    if(typeof window.claude === 'undefined') return;
+    downloadsFn = await window.claude.use('downloads');
+  } catch(e){
+    downloadsFn = null;
+  }
+})();
+
+function downloadsErrorCopy(err){
+  switch(err && err.code){
+    case 'declined': return null; // viewer said no -- not an error to surface
+    case 'rate_limited': return 'A save prompt is already open, or there have been too many recently -- wait a moment and try again.';
+    case 'too_large': return 'This file is too large to save from here.';
+    case 'unavailable':
+    case 'not_granted':
+    case 'capability_disabled':
+    case 'capability_removed':
+      return "Saving files isn't available in this view.";
+    default: return (err && err.message) ? err.message : 'Could not save the file.';
+  }
+}
+
+// Every export used window.alert() for errors, which this artifact's
+// published-page host does not reliably surface -- a failure could
+// happen with nothing visible at all (exactly what showed up with PPTX).
+// Status is now reported through this callback instead, which
+// buildDiagramCardEl wires to a small text line on the card itself;
+// noopStatus is just a safety net for any caller that doesn't pass one.
+function noopStatus(message, isError){
+  if(isError) console.error('Figure Creation Agent export:', message);
+}
+
+var downloadFallbackWarned = false;
+function downloadFile(filename, data, mimeTypeForFallback, onStatus){
+  onStatus = onStatus || noopStatus;
+  if(downloadsFn){
+    downloadsFn.save({ filename: filename, data: data }).then(function(){
+      onStatus('Saved ' + filename + '.', false);
+    }).catch(function(err){
+      var msg = downloadsErrorCopy(err);
+      if(msg) onStatus(msg, true);
+    });
+    return;
+  }
+  // No downloads capability resolved -- most likely this page is open
+  // outside Claude's own viewer (this fallback works fine there); inside
+  // a published artifact it typically won't, so warn once rather than
+  // fail with no explanation at all.
+  if(!downloadFallbackWarned){
+    downloadFallbackWarned = true;
+    console.warn('Figure Creation Agent: no "downloads" capability available -- falling back to a direct browser download, which does not work inside a published Claude artifact.');
+  }
+  var blob = (data instanceof Blob) ? data : new Blob([data], { type: mimeTypeForFallback || 'application/octet-stream' });
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  onStatus('Downloaded ' + filename + '.', false);
 }
 
-function exportSVG(shapes, arrows){
+function exportSVG(shapes, arrows, onStatus){
+  onStatus = onStatus || noopStatus;
   var built = buildExportSVG(shapes, arrows);
   var xml = new XMLSerializer().serializeToString(built.svg);
-  downloadBlob('<?xml version="1.0" standalone="no"?>\n' + xml, 'figure.svg', 'image/svg+xml');
+  downloadFile('figure.svg', '<?xml version="1.0" standalone="no"?>\n' + xml, 'image/svg+xml', onStatus);
 }
 
-function exportPNG(shapes, arrows){
+function exportPNG(shapes, arrows, onStatus){
+  onStatus = onStatus || noopStatus;
   var built = buildExportSVG(shapes, arrows);
   var xml = new XMLSerializer().serializeToString(built.svg);
   var svg64 = btoa(unescape(encodeURIComponent('<?xml version="1.0" standalone="no"?>' + xml)));
@@ -744,30 +1041,107 @@ function exportPNG(shapes, arrows){
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     canvas.toBlob(function(blob){
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url; a.download = 'figure.png';
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+      downloadFile('figure.png', blob, null, onStatus);
     }, 'image/png');
   };
-  img.onerror = function(){ alert('PNG export could not render the diagram. Try SVG export instead.'); };
+  img.onerror = function(){ onStatus('PNG export could not render the diagram. Try SVG export instead.', true); };
   img.src = 'data:image/svg+xml;base64,' + svg64;
 }
 
-function exportPPTX(shapes, arrows){
-  if(typeof window.PptxGenJS === 'undefined'){
-    alert('The PowerPoint export library did not load (needs network access to cdnjs.cloudflare.com). Try SVG or PNG export instead.');
-    return;
-  }
+// The PPTX library is loaded on demand (see loadPptxLib) rather than as a
+// blocking <script> tag at page load, so a transient network hiccup on
+// first load no longer permanently disables PPTX export for the rest of
+// the session -- each click gets its own fresh attempt.
+//
+// NOTE: pptxgenjs is not actually hosted on cdnjs.cloudflare.com at all --
+// every official install path (including its own docs) points to jsDelivr
+// instead. The original cdnjs URL here was never going to resolve, which
+// is the real reason this kept failing.
+var pptxLoadPromise = null;
+function loadPptxLib(){
+  if(typeof window.PptxGenJS !== 'undefined') return Promise.resolve();
+  if(pptxLoadPromise) return pptxLoadPromise;
+  pptxLoadPromise = new Promise(function(resolve, reject){
+    var existing = document.querySelector('script[data-pptxgenjs]');
+    if(existing) existing.remove(); // drop a prior failed attempt before retrying
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';
+    s.setAttribute('data-pptxgenjs', 'true');
+    s.onload = function(){
+      if(typeof window.PptxGenJS !== 'undefined') resolve();
+      else reject(new Error('the library loaded but PptxGenJS was not defined'));
+    };
+    s.onerror = function(){ reject(new Error('the library failed to load (check your network connection)')); };
+    document.head.appendChild(s);
+  }).catch(function(err){
+    pptxLoadPromise = null; // let the next click try again from scratch
+    throw err;
+  });
+  return pptxLoadPromise;
+}
+
+function exportPPTX(shapes, arrows, onStatus){
+  onStatus = onStatus || noopStatus;
+  onStatus('Generating PowerPoint\u2026', false);
+  loadPptxLib().then(function(){
+    return buildAndSavePptx(shapes, arrows, onStatus);
+  }).catch(function(err){
+    onStatus('Could not export to PowerPoint -- ' + err.message + '. Try SVG or PNG export instead.', true);
+  });
+}
+
+function buildAndSavePptx(shapes, arrows, onStatus){
+  onStatus = onStatus || noopStatus;
   var pptx = new window.PptxGenJS();
-  pptx.defineLayout({ name:'FC', width:13.333, height:9.524 });
+  var slideW = 13.333, slideH = 9.524;
+  pptx.defineLayout({ name:'FC', width:slideW, height:slideH });
   pptx.layout = 'FC';
   var slide = pptx.addSlide();
   var bbox = computeContentBBox(shapes);
-  var s2i = 13.333/bbox.w;
-  function px(v){ return (v-bbox.x)*s2i; }
-  function py(v){ return (v-bbox.y)*s2i; }
+
+  // Reserve a band at the bottom of the slide for the legend, and cap the
+  // diagram's height so it can never grow tall enough to push the legend
+  // off the slide -- but that cap is a worst-case ceiling, not where the
+  // legend actually goes: a wide/short diagram (common for these figures)
+  // is width-bound and ends up far shorter than the ceiling, so the
+  // legend must be anchored to the diagram's ACTUAL scaled height, not
+  // the reserved maximum, or it leaves a large gap for exactly that shape.
+  var legendBandH = 0.55, legendTopMargin = 0.18;
+  var maxDiagramH = slideH - legendBandH - legendTopMargin;
+  var s2i = Math.min(slideW/bbox.w, maxDiagramH/bbox.h);
+  var diagramH = bbox.h * s2i;
+  var contentH = diagramH + legendTopMargin + legendBandH;
+  var offsetY = Math.max(0, (slideH - contentH) / 2); // center the diagram+legend block as one unit
+  var offsetX = (slideW - bbox.w*s2i) / 2; // center horizontally too
+  function px(v){ return offsetX + (v-bbox.x)*s2i; }
+  function py(v){ return offsetY + (v-bbox.y)*s2i; }
+
+  // PPTX shrinks box dimensions by s2i (down to a fraction of an inch for
+  // a wide diagram, per the gap fix above) but was leaving font sizes as
+  // fixed point values -- fine for a normally-sized diagram, but a small
+  // fixed font in a much-smaller-than-usual box is exactly what overflows
+  // and gets clipped. SVG has no equivalent bug because box size and font
+  // size live in the SAME coordinate space there and shrink together
+  // automatically. This converts each SVG label's own font-size (in that
+  // shared coordinate space, e.g. the 12.5 in .shape-label{font-size:
+  // 12.5px}) into points at the SAME s2i scale a box uses, so text and
+  // box shrink in lockstep the way they already do in SVG/PNG. Floored so
+  // an extreme diagram doesn't go illegibly small, capped so a small
+  // diagram doesn't blow up oversized.
+  function scaledPt(svgPx){
+    return Math.max(6, Math.min(24, svgPx * s2i * 72));
+  }
+  // scaledPt floors/ceils the "pure" s2i-scaled font size for legibility,
+  // which is fine on its own -- but a label's box width computed straight
+  // from s2i then stops matching whatever font size actually got used
+  // once that clamp kicks in (a floored-up font renders wider than the
+  // box was sized for, forcing PowerPoint to break single words mid-word
+  // to fit). This gives the inches-per-SVG-unit ratio the ACTUAL clamped
+  // font implies, so box sizing built from it stays self-consistent.
+  function effectiveScaleForFont(basePx){
+    return (scaledPt(basePx) / 72) / basePx;
+  }
+
 
   shapes.filter(function(s){ return s.type==='group'; }).forEach(function(s){
     slide.addShape(pptx.ShapeType.rect, {
@@ -775,42 +1149,116 @@ function exportPPTX(shapes, arrows){
       fill:{ type:'none' }, line:{ color:'8A8676', width:1, dashType:'dash' }
     });
     if(s.label){
-      slide.addText(s.label, { x:px(s.x), y:py(s.y)-0.22, w:s.w*s2i, h:0.2, fontFace:'Consolas', fontSize:8, color:'8A8676' });
+      slide.addText(s.label, { x:px(s.x), y:py(s.y)-0.22, w:s.w*s2i, h:0.2, fontFace:'Consolas', fontSize:scaledPt(10.5), color:'8A8676', fit:'shrink' });
     }
   });
 
+  // pptxgenjs's built-in 'oval' line-end type always renders FILLED with
+  // the line's own color -- there's no hollow option in OOXML's line-end
+  // spec. SVG's co-occurrence marker is a literal circle with a white
+  // fill and a black stroke (a real hollow dot), which is a different
+  // shape, not just a different color of the same one. So that case
+  // draws no built-in end cap at all and gets this small ellipse shape
+  // at each endpoint instead, matching the SVG marker directly.
+  var DOT_D = 0.09;
+  function addDot(cx, cy){
+    slide.addShape(pptx.ShapeType.ellipse, {
+      x:cx-DOT_D/2, y:cy-DOT_D/2, w:DOT_D, h:DOT_D,
+      fill:{ color:'FFFFFF' }, line:{ color:'1C1B18', width:1 }
+    });
+  }
+
+  var dashMap = { causal:'solid', temporal:'solid', conditional:'dash', feedback:'dashDot', coOccurrence:'sysDot' };
   arrows.forEach(function(a){
     var from = findIn(shapes, a.from), to = findIn(shapes, a.to);
     if(!from || !to) return;
     var pts = computeEdgePoints(from, to);
-    var dashMap = { causal:'solid', temporal:'solid', conditional:'dash', feedback:'lgDashDot', coOccurrence:'sysDot' };
     var x1=px(pts.x1), y1=py(pts.y1), x2=px(pts.x2), y2=py(pts.y2);
     slide.addShape(pptx.ShapeType.line, {
       x:Math.min(x1,x2), y:Math.min(y1,y2), w:Math.max(Math.abs(x2-x1),0.01), h:Math.max(Math.abs(y2-y1),0.01),
       flipH: x2 < x1, flipV: y2 < y1,
       line:{ color:'1C1B18', width:1.25, dashType: dashMap[a.type] || 'solid',
+        beginArrowType: 'none',
         endArrowType: a.type==='coOccurrence' ? 'none' : (a.type==='temporal' ? 'arrow' : 'triangle') }
     });
+    if(a.type==='coOccurrence'){ addDot(x1,y1); addDot(x2,y2); }
     if(a.label){
-      var mx=(x1+x2)/2, my=(y1+y2)/2;
-      slide.addText(a.label, { x:mx-0.6, y:my-0.14, w:1.2, h:0.28, fontFace:'Georgia', italic:true, fontSize:9, align:'center', color:'5B584E', fill:{ color:'F7F5F0' } });
+      // Sized from the actual wrapped text (same wrap-width convention
+      // SVG uses), scaled by the font's effective (clamp-consistent)
+      // scale rather than a fixed inch size.
+      var lineLenUnits = Math.sqrt(Math.pow(pts.x2-pts.x1,2) + Math.pow(pts.y2-pts.y1,2)) || 1;
+      var angleInfo = lineLabelAngle(pts.x1, pts.y1, pts.x2, pts.y2);
+      var labelFont = 'italic 11px Georgia, serif';
+      var eScale = effectiveScaleForFont(11);
+
+      // Always offset above the line (never centered on top of it), and
+      // always rotated to match the line's angle -- no exemption for
+      // near-vertical arrows -- same reasoning as SVG's renderArrows.
+      var maxLabelWidthUnits = Math.min(140, Math.max(46, lineLenUnits*0.85));
+      var labelLines = wrapLabelBalanced(a.label, maxLabelWidthUnits, labelFont);
+      measureCtx.font = labelFont;
+      var labelPxW = Math.max.apply(null, labelLines.map(function(l){ return measureCtx.measureText(l).width; }));
+      var lwUnits = labelPxW + 8;
+      var lh2Units = labelLines.length * 13 + 4;
+      var boxW = Math.max(0.3, lwUnits * eScale);
+      var boxH = Math.max(0.14, lh2Units * eScale);
+
+      // Collision search happens in the same original SVG-unit space as
+      // SVG's own renderer (matching its lw/lh2/shapes exactly), so both
+      // formats pick the same anchor point; only the final chosen point
+      // gets converted to inches via px()/py() below.
+      var anchorUnits = pickLabelAnchor(shapes, a.from, a.to, pts.x1, pts.y1, pts.x2, pts.y2, lwUnits, lh2Units, lh2Units/2 + 4, angleInfo.deg);
+      var mx = px(anchorUnits.x), my = py(anchorUnits.y);
+      var rotateDeg = angleInfo.deg;
+
+      slide.addText(a.label, { x:mx-boxW/2, y:my-boxH/2, w:boxW, h:boxH, rotate:rotateDeg, fontFace:'Georgia', italic:true, fontSize:scaledPt(11), align:'center', valign:'middle', color:'5B584E', fill:{ color:'FFFFFF' }, fit:'shrink' });
     }
   });
 
   shapes.filter(function(s){ return s.type!=='group'; }).forEach(function(s){
     if(s.type==='text'){
-      slide.addText(s.label||'', { x:px(s.x), y:py(s.y), w:s.w*s2i, h:s.h*s2i, fontFace:'Georgia', fontSize:11, color:'1C1B18', valign:'middle' });
+      slide.addText(s.label||'', { x:px(s.x), y:py(s.y), w:s.w*s2i, h:s.h*s2i, fontFace:'Georgia', fontSize:scaledPt(12.5), color:'1C1B18', valign:'middle', fit:'shrink' });
       return;
     }
     var shapeType = s.type==='ellipse' ? pptx.ShapeType.ellipse : s.type==='roundRect' ? pptx.ShapeType.roundRect : pptx.ShapeType.rect;
     slide.addText(s.label||'', {
       shape: shapeType, x:px(s.x), y:py(s.y), w:s.w*s2i, h:s.h*s2i,
       fill:{ color:'FFFFFF' }, line:{ color:'1C1B18', width:1.25 },
-      align:'center', valign:'middle', fontFace:'Arial', fontSize:11, color:'1C1B18'
+      align:'center', valign:'middle', fontFace:'Arial', fontSize:scaledPt(12.5), color:'1C1B18', fit:'shrink'
     });
   });
 
-  pptx.writeFile({ fileName:'figure.pptx' });
+  // Legend: same five kinds and the same LEGEND_ITEMS table the SVG/PNG
+  // export uses, so it can't drift out of sync -- drawn in the reserved
+  // band below the diagram rather than in the same style (PPTX arrows use
+  // dash/arrowhead properties, not SVG markers, so the swatches use
+  // whichever of those the arrow-drawing loop above actually used).
+  var legendY = offsetY + diagramH + legendTopMargin;
+  var lx = 0.3;
+  LEGEND_ITEMS.forEach(function(item){
+    var lineLen = 0.35;
+    slide.addShape(pptx.ShapeType.line, {
+      x:lx, y:legendY+0.1, w:lineLen, h:0.01,
+      line:{ color:'1C1B18', width:1.25, dashType: dashMap[item.type] || 'solid',
+        beginArrowType: 'none',
+        endArrowType: item.type==='coOccurrence' ? 'none' : (item.type==='temporal' ? 'arrow' : 'triangle') }
+    });
+    if(item.type==='coOccurrence'){ addDot(lx, legendY+0.1); addDot(lx+lineLen, legendY+0.1); }
+    slide.addText(item.label, {
+      x:lx+lineLen+0.08, y:legendY, w:1.2, h:0.3, fontFace:'Arial', fontSize:9, color:'95917F', valign:'middle'
+    });
+    lx += lineLen + 0.08 + 1.2 + 0.12;
+  });
+
+  // pptx.writeFile() does its own internal browser-download attempt,
+  // which is exactly the "script-started save" that's inert once this
+  // page is actually published -- get the file as a Blob instead and
+  // hand it to the same downloads-capability path every other export uses.
+  return pptx.write({ outputType:'blob' }).then(function(blob){
+    downloadFile('figure.pptx', blob, null, onStatus);
+  }).catch(function(err){
+    onStatus('Could not build the PowerPoint file -- ' + ((err && err.message) || 'unknown error') + '.', true);
+  });
 }
 
 /* ============================================================
@@ -981,30 +1429,49 @@ function tryParseInvokeXml(text){
   return actions;
 }
 
+// Tolerant JSON extraction: try the whole (fence-stripped) string first;
+// if Drew added a sentence or two before the JSON despite being told not
+// to, fall back to the first '{' or '[' through the matching last brace/
+// bracket and try parsing just that span. This mirrors exactly how the
+// platform's own sample.json() reads a reply (whole text, else one
+// fenced block, else first-to-last brace), so a stray lead-in sentence
+// doesn't sink the entire response and silently draw nothing.
+function tryParseJsonLoose(s){
+  try{ return JSON.parse(s); } catch(e){}
+  var firstBrace = s.indexOf('{'), firstBracket = s.indexOf('[');
+  var start = (firstBrace === -1) ? firstBracket
+    : (firstBracket === -1) ? firstBrace
+    : Math.min(firstBrace, firstBracket);
+  if(start === -1) return null;
+  var closeCh = s[start] === '{' ? '}' : ']';
+  var end = s.lastIndexOf(closeCh);
+  if(end === -1 || end <= start) return null;
+  try{ return JSON.parse(s.slice(start, end + 1)); } catch(e){ return null; }
+}
+
 function parseDrewResponse(text){
   var raw = text || '';
   var cleaned = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
-  try{
-    var obj = JSON.parse(cleaned);
+  var obj = tryParseJsonLoose(cleaned);
+  if(obj){
     return {
       message: typeof obj.message === 'string' ? obj.message : '',
       actions: Array.isArray(obj.actions) ? obj.actions : []
     };
-  } catch(e){
-    var xmlActions = tryParseInvokeXml(raw);
-    if(xmlActions.length){
-      var lead = raw.split('<function_calls>')[0].trim();
-      return { message: lead, actions: xmlActions };
-    }
-    // Nothing recognizable parsed. If it still looks like a broken attempt
-    // at tool-call syntax, don't dump raw tags into the chat -- show a
-    // clean message instead. Otherwise the text is probably just a plain
-    // reply that didn't need the JSON envelope; show it as-is.
-    if(/<function_calls|<invoke/.test(raw)){
-      return { message: "Drew tried to make a change but the response wasn't in a format this chat could read — try asking again.", actions: [] };
-    }
-    return { message: raw, actions: [] };
   }
+  var xmlActions = tryParseInvokeXml(raw);
+  if(xmlActions.length){
+    var lead = raw.split('<function_calls>')[0].trim();
+    return { message: lead, actions: xmlActions };
+  }
+  // Nothing recognizable parsed. If it still looks like a broken attempt
+  // at tool-call syntax, don't dump raw tags into the chat -- show a
+  // clean message instead. Otherwise the text is probably just a plain
+  // reply that didn't need the JSON envelope; show it as-is.
+  if(/<function_calls|<invoke/.test(raw)){
+    return { message: "Drew tried to make a change but the response wasn't in a format this chat could read — try asking again.", actions: [] };
+  }
+  return { message: raw, actions: [] };
 }
 
 // Runs Drew's actions in order, resolving any tempId references to shapes
@@ -1355,9 +1822,26 @@ function avatarHTML(persona){
    turns and tool calls, so they stay genuinely aware of each other)
    ============================================================ */
 var lastPersona = 'thea'; // who to show in the typing indicator
-var conv = [];       // shared API message history
+var conv = [];       // shared conversation history (plain user/assistant turns)
 var chatLog = [];    // shared display log
 var isSending = false;
+
+// This is a published artifact, not the chat's own preview -- it can't fetch
+// api.anthropic.com directly. Instead it asks Claude through a capability
+// the viewer grants when they open the page. That capability has no
+// "system" role, so Thea's and Drew's instructions are folded into a
+// leading user turn on every call instead (see callClaude). Resolved once
+// at load; stays null if this view can't use it (e.g. opened outside
+// Claude, or the viewer declines the very first prompt).
+var sampleFn = null;
+(async function initSample(){
+  try{
+    if(typeof window.claude === 'undefined') return;
+    sampleFn = await window.claude.use('sample');
+  } catch(e){
+    sampleFn = null;
+  }
+})();
 
 function pushLog(entry){ chatLog.push(entry); renderChatFeed(); }
 
@@ -1375,29 +1859,63 @@ function setSending(persona, v){
   renderChatFeed();
 }
 
+// Keeps one call's turns under the capability's size limit as a session
+// grows, by trimming from the front (oldest first). The instructions turn
+// itself is rebuilt fresh each call rather than stored here, so it's never
+// at risk of being the thing that gets trimmed.
+function recentConv(){
+  var MAX_TURNS = 24;
+  return conv.length > MAX_TURNS ? conv.slice(conv.length - MAX_TURNS) : conv;
+}
+
+// Maps the capability's stable error codes to what a researcher should be
+// told. Returning null means "say nothing new" (a cancelled call).
+function sampleErrorCopy(err){
+  switch(err && err.code){
+    case 'not_granted':
+      return "Claude access wasn't allowed for this artifact -- reload the page and accept the prompt to talk to Thea and Drew.";
+    case 'rate_limited':
+      return 'Too many requests right now -- wait a moment and try again.';
+    case 'refused':
+      return "Claude declined to respond to that -- try rephrasing.";
+    case 'empty_completion':
+      return "Claude didn't return anything -- try again, maybe with a shorter message.";
+    case 'prompt_too_large':
+      return 'This message is too long for one turn -- try trimming it.';
+    case 'session_expired':
+      return 'Your session expired -- reload the page.';
+    case 'sampling_disabled':
+    case 'not_declared':
+    case 'capability_disabled':
+    case 'capability_removed':
+      return "Claude isn't available in this view.";
+    case 'cancelled':
+      return null;
+    default:
+      return (err && err.message) ? err.message : 'something went wrong.';
+  }
+}
+
+var PERMANENT_ERROR_CODES = ['not_granted','sampling_disabled','not_declared','capability_disabled','capability_removed'];
+
 async function callClaude(persona, userText){
   conv.push({ role:'user', content:userText });
   pushLog({ type:'user', text:userText });
   setSending(persona, true);
+
+  if(!sampleFn){
+    pushLog({ type:'error', text:"Thea and Drew talk to Claude through this page's own Claude access, which isn't available right now -- try reloading this artifact." });
+    setSending(persona, false);
+    return;
+  }
+
   try{
-    var body = {
-      model:'claude-sonnet-4-6',
-      max_tokens:1000,
-      system: persona==='thea' ? theaSystemPrompt() : drewSystemPrompt(),
-      messages: conv
-    };
-    var res = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify(body)
-    });
-    var data = await res.json();
-    if(!res.ok || data.type==='error'){
-      throw new Error((data.error && data.error.message) || ('Request failed (' + res.status + ')'));
-    }
-    var content = data.content || [];
-    conv.push({ role:'assistant', content:content });
-    var text = content.filter(function(b){ return b.type==='text'; }).map(function(b){ return b.text; }).join('\n').trim();
+    var instructions = persona==='thea' ? theaSystemPrompt() : drewSystemPrompt();
+    var turns = [{ role:'user', content: instructions }].concat(recentConv());
+    var result = await sampleFn(turns, { modelTier:'default', cache:false });
+    var text = ((result && result.text) || '').trim();
+
+    conv.push({ role:'assistant', content:text });
 
     if(persona==='thea'){
       if(text) pushAssistant('thea', text);
@@ -1416,7 +1934,9 @@ async function callClaude(persona, userText){
       }
     }
   } catch(err){
-    pushLog({ type:'error', text:'Trouble reaching Claude: ' + err.message });
+    var copy = sampleErrorCopy(err);
+    if(copy) pushLog({ type:'error', text:'Trouble reaching Claude: ' + copy });
+    if(err && PERMANENT_ERROR_CODES.indexOf(err.code) !== -1) sampleFn = null;
   } finally {
     setSending(persona, false);
   }
@@ -1434,7 +1954,12 @@ function smallBtn(label, onClick){
 function buildDiagramCardEl(entry){
   var card = document.createElement('div');
   card.className = 'diagram-card';
-  var built = buildExportSVG(entry.shapes, entry.arrows);
+  // includeLegend:false -- the exported SVG/PNG/PPTX need the legend baked
+  // in since they leave the chat as standalone files, but this on-screen
+  // card already has its own separate HTML legend row right below (the
+  // .diagram-legend div a few lines down), so including both here
+  // doubled up the same five entries in the live display.
+  var built = buildExportSVG(entry.shapes, entry.arrows, false);
   card.appendChild(built.svg);
   var legend = document.createElement('div');
   legend.className = 'diagram-legend';
@@ -1448,11 +1973,26 @@ function buildDiagramCardEl(entry){
   footer.appendChild(stats);
   var exportsWrap = document.createElement('div');
   exportsWrap.className = 'diagram-card-exports';
-  exportsWrap.appendChild(smallBtn('SVG', function(){ exportSVG(entry.shapes, entry.arrows); }));
-  exportsWrap.appendChild(smallBtn('PNG', function(){ exportPNG(entry.shapes, entry.arrows); }));
-  exportsWrap.appendChild(smallBtn('PPTX', function(){ exportPPTX(entry.shapes, entry.arrows); }));
+
+  var statusEl = document.createElement('div');
+  statusEl.className = 'diagram-card-status';
+  var statusTimer = null;
+  function setStatus(message, isError){
+    statusEl.textContent = message || '';
+    statusEl.classList.toggle('is-error', !!isError);
+    statusEl.classList.toggle('is-visible', !!message);
+    if(statusTimer){ clearTimeout(statusTimer); statusTimer = null; }
+    if(message && !isError){
+      statusTimer = setTimeout(function(){ statusEl.classList.remove('is-visible'); }, 4000);
+    }
+  }
+
+  exportsWrap.appendChild(smallBtn('SVG', function(){ exportSVG(entry.shapes, entry.arrows, setStatus); }));
+  exportsWrap.appendChild(smallBtn('PNG', function(){ exportPNG(entry.shapes, entry.arrows, setStatus); }));
+  exportsWrap.appendChild(smallBtn('PPTX', function(){ exportPPTX(entry.shapes, entry.arrows, setStatus); }));
   footer.appendChild(exportsWrap);
   card.appendChild(footer);
+  card.appendChild(statusEl);
   return card;
 }
 
