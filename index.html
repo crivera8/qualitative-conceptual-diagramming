@@ -128,6 +128,49 @@
   .radio-group label{ display:flex; align-items:center; gap:9px; font-size:13px; line-height:1.4; color:var(--ink); cursor:pointer; }
   .radio-group input[type=radio]{ flex:none; width:15px; height:15px; margin-top:0; }
 
+  /* ---------- "see an example" chips and cards ---------- */
+  .radio-row{ position:relative; display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap; }
+  .radio-row > label{ flex:1 1 60%; min-width:0; }
+  .eg-chip{
+    flex:none; margin-top:1px; padding:2px 9px;
+    background:var(--white); border:1px solid var(--line); border-radius:11px;
+    font-family:var(--font-mono); font-size:10px; letter-spacing:.03em;
+    color:var(--ink-soft); cursor:pointer; white-space:nowrap; line-height:1.6;
+  }
+  .eg-chip:hover{ border-color:var(--ink-soft); color:var(--ink); }
+  .eg-chip[aria-expanded="true"]{ background:var(--ink); border-color:var(--ink); color:var(--white); }
+  .eg-card{
+    display:none;
+    position:absolute; top:calc(100% + 6px); left:0; z-index:6;
+    width:min(330px, 100%);
+    background:var(--paper); border:1px solid var(--rule); border-radius:8px;
+    box-shadow:0 12px 30px rgba(28,27,24,0.16);
+    padding:12px 13px;
+  }
+  .eg-card.is-open{ display:block; animation:egCardIn .13s ease; }
+  @keyframes egCardIn{ from{ opacity:0; transform:translateY(-3px); } to{ opacity:1; transform:none; } }
+  .eg-visual{
+    margin:0 0 9px; padding:8px; background:var(--white);
+    border:1px solid var(--rule); border-radius:5px;
+  }
+  .eg-visual svg{ display:block; width:100%; height:auto; }
+  .eg-visual img{ display:block; width:100%; height:auto; border-radius:3px; }
+  .eg-credit{ font-size:10px; color:var(--ink-faint); margin:6px 0 0; line-height:1.4; }
+  .eg-claim{ font-size:12px; line-height:1.5; color:var(--ink); margin:0 0 8px; }
+  .eg-cite{ font-size:10.5px; line-height:1.5; color:var(--ink-faint); margin:0; }
+  .eg-cite-fig{ display:block; color:var(--ink-soft); font-style:italic; }
+  .eg-cite a{ color:var(--thea); }
+  /* A floating card will not fit next to the option at phone width, so it
+     becomes a full-width panel that opens below the chip and pushes the
+     rest of the list down instead of covering it. */
+  @media (max-width: 520px){
+    .radio-row > label{ flex:1 1 100%; }
+    .eg-card{ position:static; width:100%; margin-top:6px; box-shadow:none; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .eg-card.is-open{ animation:none; }
+  }
+
   .check-inline{ display:flex; align-items:center; gap:6px; margin:5px 0 0; font-size:12px; color:var(--ink-soft); cursor:pointer; }
   .check-inline input{ width:14px; height:14px; }
 
@@ -367,9 +410,21 @@
 
     <label class="field-label">What sort of model do you think this is?</label>
     <div class="radio-group" id="intakeModelType">
-      <label><input type="radio" name="modelType" value="variance"> Variance-based — constructs and the relationships between them explain variation in an outcome; the arrows carry the argument, not a time order</label>
-      <label><input type="radio" name="modelType" value="process"> Process-based — one shared sequence: things unfold or lead to each other over time, in roughly the same way for everyone</label>
-      <label><input type="radio" name="modelType" value="sequential"> Sequential — a series of stages that unfolds in order, though the exact steps may differ slightly across actors</label>
+      <div class="radio-row">
+        <label><input type="radio" name="modelType" value="variance"> Variance-based — constructs and the relationships between them explain variation in an outcome; the arrows carry the argument, not a time order</label>
+        <button type="button" class="eg-chip" data-example="variance" aria-expanded="false" aria-controls="eg-card-variance">see an example</button>
+        <div class="eg-card" id="eg-card-variance"></div>
+      </div>
+      <div class="radio-row">
+        <label><input type="radio" name="modelType" value="process"> Process-based — a trigger opens into different pathways that end in different outcomes; what varies is which path a case takes</label>
+        <button type="button" class="eg-chip" data-example="process" aria-expanded="false" aria-controls="eg-card-process">see an example</button>
+        <div class="eg-card" id="eg-card-process"></div>
+      </div>
+      <div class="radio-row">
+        <label><input type="radio" name="modelType" value="sequential"> Sequential — numbered events in one order, each following from the last; the boxes hold things that happen, not variables</label>
+        <button type="button" class="eg-chip" data-example="sequential" aria-expanded="false" aria-controls="eg-card-sequential">see an example</button>
+        <div class="eg-card" id="eg-card-sequential"></div>
+      </div>
       <label>
         <input type="radio" name="modelType" value="other"> Something else
         <input type="text" id="intakeModelOther" class="field-input inline" placeholder="describe it" disabled>
@@ -463,6 +518,149 @@
 /* ============================================================
    STATE  (mutated only via Drew's tools — no direct manipulation)
    ============================================================ */
+/* ============================================================
+   MODEL_EXAMPLES -- content for the "see an example" cards on the intake
+   screen. Kept here, away from the layout and interaction code, so the
+   wording, the citations and the drawings can be edited without touching
+   any of the popover machinery.
+
+   WHY THESE ARE OUR OWN DRAWINGS. Re-hosting a published figure depends on
+   that figure's licence even when the paper is open access, and most of
+   what fits our criteria is not licensed to permit it. So each card ships a
+   schematic we drew plus a citation and a link, and embeds no published
+   figure.
+
+   The three examples sit in THREE DIFFERENT licence positions. Do not
+   collapse these into one blanket statement, and do not generalise any of
+   them to a future example:
+
+     Sayegh (process)     CONFIRMED open access under CC BY 4.0. Figure 1
+                          may be reproduced or adapted with attribution.
+     Shen (variance)      Frontiers in Psychology publishes CC BY 4.0 as its
+                          standard, which would permit the same -- but that
+                          is NOT confirmed for this article. Treat as
+                          unconfirmed and check the article's own copyright
+                          statement before reproducing anything from it.
+     Tilcsik (sequential) Academy of Management Journal, 2010. NOT open
+                          access. Do not reproduce this figure under any
+                          circumstances -- cite and link only.
+
+   That is why `visual.kind` is per-example rather than one setting for the
+   whole feature. One card's drawing may later be replaced by the actual
+   published figure, and renderExampleVisual() already handles
+   kind:'reproduction' (an <img> plus a required credit line), so swapping
+   one in is a data change here rather than a rebuild.
+
+   A note on the drawings themselves: each type has a signature a reader
+   should catch before reading any label -- sequential is NUMBERED and
+   unbranching, process BRANCHES to different outcomes, variance has no time
+   order and a moderator landing on a RELATIONSHIP. If two of them start to
+   look alike, the cards have stopped doing their job.
+   ============================================================ */
+var MODEL_EXAMPLES = {
+
+  variance: {
+    claim: 'That these constructs explain variation in the outcome; nothing here claims one thing happened before another.',
+    visual: {
+      kind: 'schematic',
+      alt: 'Antecedent leads to mechanism leads to outcome, with a moderator box whose arrow lands on the mechanism-to-outcome arrow rather than on a box.',
+      svg:
+        '<svg viewBox="0 0 300 140" xmlns="http://www.w3.org/2000/svg">' +
+        '<defs><marker id="egArrowVar" markerWidth="8" markerHeight="8" refX="6.6" refY="3.5" orient="auto">' +
+        '<path d="M0,0 L7,3.5 L0,7 Z" fill="var(--ink)"/></marker></defs>' +
+        '<rect x="161" y="26" width="84" height="28" rx="4" fill="var(--white)" stroke="var(--ink)" stroke-width="1.2"/>' +
+        '<text x="203" y="43" text-anchor="middle" font-family="var(--font-body)" font-size="9" fill="var(--ink)">Moderator</text>' +
+        '<line x1="203" y1="54" x2="203" y2="98" stroke="var(--ink)" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#egArrowVar)"/>' +
+        '<rect x="6" y="88" width="76" height="28" rx="4" fill="var(--white)" stroke="var(--ink)" stroke-width="1.2"/>' +
+        '<text x="44" y="105" text-anchor="middle" font-family="var(--font-body)" font-size="9" fill="var(--ink)">Antecedent</text>' +
+        '<rect x="112" y="88" width="76" height="28" rx="4" fill="var(--white)" stroke="var(--ink)" stroke-width="1.2"/>' +
+        '<text x="150" y="105" text-anchor="middle" font-family="var(--font-body)" font-size="9" fill="var(--ink)">Mechanism</text>' +
+        '<rect x="218" y="88" width="76" height="28" rx="4" fill="var(--white)" stroke="var(--ink)" stroke-width="1.2"/>' +
+        '<text x="256" y="105" text-anchor="middle" font-family="var(--font-body)" font-size="9" fill="var(--ink)">Outcome</text>' +
+        '<line x1="82" y1="102" x2="110" y2="102" stroke="var(--ink)" stroke-width="1.4" marker-end="url(#egArrowVar)"/>' +
+        '<line x1="188" y1="102" x2="216" y2="102" stroke="var(--ink)" stroke-width="1.4" marker-end="url(#egArrowVar)"/>' +
+        '<text x="203" y="132" text-anchor="middle" font-family="var(--font-body)" font-size="8" font-style="italic" fill="var(--ink-soft)">on the relationship, not the box</text>' +
+        '</svg>'
+    },
+    example: {
+      figure: 'Figure 1, "The generative mechanism of boomerang behavior"',
+      citation: 'Shen, C. (2026). The generative mechanism of workplace boomerang behavior: a grounded theory approach. Frontiers in Psychology, 17, 1755787.',
+      url: 'https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1755787/full'
+    }
+  },
+
+  process: {
+    claim: 'That a single trigger can end in different outcomes; what varies is which pathway a case takes.',
+    visual: {
+      kind: 'schematic',
+      alt: 'A trigger leads to a mechanism, which branches into two different outcomes, each branch carrying a condition label.',
+      svg:
+        '<svg viewBox="0 0 320 150" xmlns="http://www.w3.org/2000/svg">' +
+        '<defs><marker id="egArrowProc" markerWidth="8" markerHeight="8" refX="6.6" refY="3.5" orient="auto">' +
+        '<path d="M0,0 L7,3.5 L0,7 Z" fill="var(--ink)"/></marker></defs>' +
+        '<rect x="4" y="61" width="72" height="28" rx="4" fill="var(--white)" stroke="var(--ink)" stroke-width="1.2"/>' +
+        '<text x="40" y="78" text-anchor="middle" font-family="var(--font-body)" font-size="9" fill="var(--ink)">Trigger</text>' +
+        '<rect x="104" y="61" width="72" height="28" rx="4" fill="var(--white)" stroke="var(--ink)" stroke-width="1.2"/>' +
+        '<text x="140" y="78" text-anchor="middle" font-family="var(--font-body)" font-size="9" fill="var(--ink)">Mechanism</text>' +
+        '<rect x="230" y="18" width="86" height="28" rx="4" fill="var(--white)" stroke="var(--ink)" stroke-width="1.2"/>' +
+        '<text x="273" y="35" text-anchor="middle" font-family="var(--font-body)" font-size="9" fill="var(--ink)">Outcome A</text>' +
+        '<rect x="230" y="104" width="86" height="28" rx="4" fill="var(--white)" stroke="var(--ink)" stroke-width="1.2"/>' +
+        '<text x="273" y="121" text-anchor="middle" font-family="var(--font-body)" font-size="9" fill="var(--ink)">Outcome B</text>' +
+        '<line x1="76" y1="75" x2="102" y2="75" stroke="var(--ink)" stroke-width="1.4" marker-end="url(#egArrowProc)"/>' +
+        '<line x1="176" y1="73" x2="228" y2="36" stroke="var(--ink)" stroke-width="1.4" marker-end="url(#egArrowProc)"/>' +
+        '<line x1="176" y1="77" x2="228" y2="114" stroke="var(--ink)" stroke-width="1.4" marker-end="url(#egArrowProc)"/>' +
+        '<text x="198" y="47" text-anchor="middle" font-family="var(--font-body)" font-size="8" font-style="italic" fill="var(--ink-soft)">if converging</text>' +
+        '<text x="198" y="101" text-anchor="middle" font-family="var(--font-body)" font-size="8" font-style="italic" fill="var(--ink-soft)">if diverging</text>' +
+        '</svg>'
+    },
+    example: {
+      figure: 'Figure 1, "Reconciling Expert Practice Differences"',
+      citation: 'Sayegh, G., Langley, A., & Faraj, S. (2025). Unsettling Settled Knowing: Reconciling Differences in Expert Practice. Organization Science.',
+      url: 'https://pubsonline.informs.org/doi/10.1287/orsc.2021.15859'
+    }
+  },
+
+  sequential: {
+    claim: 'That these events occur in this order, each following from the last; the boxes hold happenings, not variables.',
+    visual: {
+      kind: 'schematic',
+      alt: 'Three numbered steps in one unbranching vertical chain ending in a terminal state, with two facilitating factors entering from the side at different transitions, each on an arrow marked plus.',
+      svg:
+        '<svg viewBox="0 0 300 184" xmlns="http://www.w3.org/2000/svg">' +
+        '<defs><marker id="egArrowSeq" markerWidth="8" markerHeight="8" refX="6.6" refY="3.5" orient="auto">' +
+        '<path d="M0,0 L7,3.5 L0,7 Z" fill="var(--ink)"/></marker></defs>' +
+        '<circle cx="12" cy="21" r="8" fill="var(--ink)"/><text x="12" y="24.5" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="var(--white)">1</text>' +
+        '<rect x="26" y="8" width="118" height="26" rx="3" fill="var(--white)" stroke="var(--ink)" stroke-width="1.2"/>' +
+        '<text x="85" y="24.5" text-anchor="middle" font-family="var(--font-body)" font-size="8.5" fill="var(--ink)">Pressures emerge</text>' +
+        '<circle cx="12" cy="65" r="8" fill="var(--ink)"/><text x="12" y="68.5" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="var(--white)">2</text>' +
+        '<rect x="26" y="52" width="118" height="26" rx="3" fill="var(--white)" stroke="var(--ink)" stroke-width="1.2"/>' +
+        '<text x="85" y="68.5" text-anchor="middle" font-family="var(--font-body)" font-size="8.5" fill="var(--ink)">Adoption evaluated</text>' +
+        '<circle cx="12" cy="109" r="8" fill="var(--ink)"/><text x="12" y="112.5" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="var(--white)">3</text>' +
+        '<rect x="26" y="96" width="118" height="26" rx="3" fill="var(--white)" stroke="var(--ink)" stroke-width="1.2"/>' +
+        '<text x="85" y="112.5" text-anchor="middle" font-family="var(--font-body)" font-size="8.5" fill="var(--ink)">Judged useful only</text>' +
+        '<rect x="26" y="140" width="118" height="26" rx="12" fill="var(--paper-deep)" stroke="var(--ink)" stroke-width="1.6"/>' +
+        '<text x="85" y="156.5" text-anchor="middle" font-family="var(--font-body)" font-size="8.5" fill="var(--ink)">Symbolic adoption</text>' +
+        '<line x1="85" y1="34" x2="85" y2="50" stroke="var(--ink)" stroke-width="1.4" marker-end="url(#egArrowSeq)"/>' +
+        '<line x1="85" y1="78" x2="85" y2="94" stroke="var(--ink)" stroke-width="1.4" marker-end="url(#egArrowSeq)"/>' +
+        '<line x1="85" y1="122" x2="85" y2="138" stroke="var(--ink)" stroke-width="1.4" marker-end="url(#egArrowSeq)"/>' +
+        '<rect x="186" y="32" width="104" height="22" rx="3" fill="var(--white)" stroke="var(--line)" stroke-width="1"/>' +
+        '<text x="238" y="46.5" text-anchor="middle" font-family="var(--font-body)" font-size="8" fill="var(--ink-soft)">Interests conflict</text>' +
+        '<line x1="186" y1="43" x2="89" y2="43" stroke="var(--ink-soft)" stroke-width="1.2" marker-end="url(#egArrowSeq)"/>' +
+        '<text x="137" y="39" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="var(--ink-soft)">+</text>' +
+        '<rect x="186" y="76" width="104" height="22" rx="3" fill="var(--white)" stroke="var(--line)" stroke-width="1"/>' +
+        '<text x="238" y="90.5" text-anchor="middle" font-family="var(--font-body)" font-size="8" fill="var(--ink-soft)">Legitimacy gain</text>' +
+        '<line x1="186" y1="87" x2="89" y2="87" stroke="var(--ink-soft)" stroke-width="1.2" marker-end="url(#egArrowSeq)"/>' +
+        '<text x="137" y="83" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="var(--ink-soft)">+</text>' +
+        '</svg>'
+    },
+    example: {
+      figure: 'Figure 1, "A Road to Decoupling"',
+      citation: 'Tilcsik, A. (2010). From Ritual to Reality: Demography, Ideology, and Decoupling in a Post-Communist Government Agency. Academy of Management Journal, 53(6), 1474-1498.',
+      url: 'https://doi.org/10.5465/amj.2010.57318905'
+    }
+  }
+};
+
 var state = { shapes: [], arrows: [] };
 var idCounter = 0;
 var placeCursor = { x:60, y:60 };
@@ -1658,11 +1856,21 @@ The matching shape is antecedent -> mechanism -> outcome, with any
 moderator attached to a relationship rather than to a box. Check that
 each arrow is doing explanatory work rather than smuggling in a sequence,
 and that a moderator is moderating a relationship rather than sitting in
-the flow as one more antecedent. If it was
-"process-based" or "sequential," that's a process/sequence figure,
-possibly with phases — check whether every case actually follows the same
-path or whether some of that variation is hiding underneath a claim of
-uniformity. If they weren't sure, don't force it; work it out together
+the flow as one more antecedent. If it was "process-based," they're describing a trigger that opens into
+different pathways ending in different outcomes — what varies is which
+path a case takes. The matching shape branches; check that the branch
+points are real points of divergence and that each pathway ends somewhere
+genuinely different, rather than the same outcome relabelled.
+
+If it was "sequential," they're describing events in one order, each
+following from the last, ending in a single terminal state. The boxes
+should hold happenings rather than variables — if they hold variables,
+it is probably a variance model wearing a sequence's clothes, which is the
+most common mix-up here. Check also where any facilitating factor
+attaches: one entering at a specific transition makes a sharper claim than
+one floating beside the whole chain.
+
+If they weren't sure, don't force it; work it out together
 from what they've told you and whatever material they share next.
 
 Once you've given that initial read, ask — briefly, and only what you
@@ -2503,12 +2711,119 @@ function attachDictation(btnEl, targetEl, statusEl, alwaysShow){
 }
 
 /* ============================================================
+   "SEE AN EXAMPLE" CARDS
+   Content lives in MODEL_EXAMPLES at the top of this file. Pinning is the
+   PRIMARY interaction and hover is the enhancement: on a touch screen
+   there is no hover at all, and pinning is also what makes the card
+   reachable from the keyboard. At most one card is open at any moment.
+   ============================================================ */
+var EXAMPLE_KEYS = ['variance', 'process', 'sequential'];
+var examplePinned = null;   // key of the pinned card, or null
+var exampleHovered = null;  // key under the pointer/focus, or null
+
+function renderExampleVisual(v){
+  if(v.kind === 'reproduction'){
+    // A reproduced published figure. Only reachable where that figure's
+    // licence permits reproduction -- see the licence notes beside
+    // MODEL_EXAMPLES, which differ per example. Credit is required here,
+    // not optional.
+    return '<figure class="eg-visual">' +
+      '<img src="' + escapeHtml(v.src || '') + '" alt="' + escapeHtml(v.alt || '') + '">' +
+      '<figcaption class="eg-credit">' + escapeHtml(v.credit || '') + '</figcaption>' +
+      '</figure>';
+  }
+  // Our own drawing. role=img with a label, because the SVG is one picture
+  // rather than a set of separately meaningful nodes.
+  return '<div class="eg-visual" role="img" aria-label="' + escapeHtml(v.alt || '') + '">' + v.svg + '</div>';
+}
+
+function exampleCardHTML(entry){
+  return renderExampleVisual(entry.visual) +
+    '<p class="eg-claim">' + escapeHtml(entry.claim) + '</p>' +
+    '<p class="eg-cite">' +
+      '<span class="eg-cite-fig">' + escapeHtml(entry.example.figure) + '</span>' +
+      escapeHtml(entry.example.citation) +
+      ' <a href="' + escapeHtml(entry.example.url) + '" target="_blank" rel="noopener">view the paper</a>' +
+    '</p>';
+}
+
+function exampleChip(key){ return document.querySelector('.eg-chip[data-example="' + key + '"]'); }
+function exampleCard(key){ return document.getElementById('eg-card-' + key); }
+
+function renderExampleState(){
+  EXAMPLE_KEYS.forEach(function(key){
+    var open = examplePinned ? (key === examplePinned) : (key === exampleHovered);
+    var card = exampleCard(key), chip = exampleChip(key);
+    if(!card || !chip) return;
+    card.classList.toggle('is-open', open);
+    chip.setAttribute('aria-expanded', String(open));
+  });
+}
+
+function pinExample(key){
+  // Opening one closes any other, pinned or merely hovered.
+  examplePinned = (examplePinned === key) ? null : key;
+  exampleHovered = null;
+  renderExampleState();
+}
+
+function closePinnedExample(refocus){
+  if(!examplePinned) return;
+  var key = examplePinned;
+  examplePinned = null;
+  renderExampleState();
+  if(refocus){ var chip = exampleChip(key); if(chip) chip.focus(); }
+}
+
+function wireExampleCards(){
+  EXAMPLE_KEYS.forEach(function(key){
+    var entry = MODEL_EXAMPLES[key];
+    var card = exampleCard(key), chip = exampleChip(key);
+    if(!entry || !card || !chip) return;
+    card.innerHTML = exampleCardHTML(entry);
+
+    // A <button> already fires click for Enter and Space, so one handler
+    // covers both without a keydown listener that would double-toggle.
+    chip.addEventListener('click', function(e){ e.preventDefault(); pinExample(key); });
+
+    chip.addEventListener('mouseenter', function(){ exampleHovered = key; renderExampleState(); });
+    chip.addEventListener('focus', function(){ exampleHovered = key; renderExampleState(); });
+    chip.addEventListener('blur', function(){
+      if(exampleHovered === key){ exampleHovered = null; renderExampleState(); }
+    });
+
+    // Leaving the row, not just the chip -- otherwise the card closes as
+    // the pointer travels from the chip onto the card to read it.
+    var row = chip.closest('.radio-row');
+    if(row){
+      row.addEventListener('mouseleave', function(){
+        if(exampleHovered === key){ exampleHovered = null; renderExampleState(); }
+      });
+      row.addEventListener('mouseenter', function(){ exampleHovered = key; renderExampleState(); });
+    }
+  });
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && examplePinned){ closePinnedExample(true); }
+  });
+
+  // Clicking away dismisses a pinned card. Not specified, but a popover
+  // that can only be closed from its own chip strands people who clicked
+  // elsewhere expecting it to go.
+  document.addEventListener('click', function(e){
+    if(!examplePinned) return;
+    if(!e.target.closest || !e.target.closest('.radio-row')) closePinnedExample(false);
+  });
+}
+
+/* ============================================================
    INIT
    ============================================================ */
 function init(){
   attachDictation(document.getElementById('intakeExtraMic'), document.getElementById('intakeExtra'), document.getElementById('intakeExtraMicStatus'), true);
   attachDictation(document.getElementById('micBtn'), document.getElementById('composerInput'), document.getElementById('composerMicStatus'), false);
   if(synthAvailable){ pickVoice('thea'); pickVoice('drew'); }
+  wireExampleCards();
   showScreen('consent');
 }
 init();
