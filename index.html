@@ -435,6 +435,15 @@
     <div class="chip-list" id="intakeFactorList"></div>
     <label class="check-inline"><input type="checkbox" id="intakeFactorsUnsure"> I'm not sure</label>
 
+    <label class="field-label" for="intakeRelationships">How do those things relate to each other?<span class="field-hint">Optional — which ones drive which, what's downstream of what, anything you already suspect.</span></label>
+    <div class="field-row-mic">
+      <textarea id="intakeRelationships" class="field-input" rows="3"></textarea>
+      <button class="mic-btn hidden" id="intakeRelationshipsMic" type="button" title="Dictate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+      </button>
+    </div>
+    <p class="mic-status" id="intakeRelationshipsMicStatus"></p>
+
     <label class="field-label">What sort of model do you think this is?</label>
     <div class="radio-group" id="intakeModelType">
       <div class="radio-row">
@@ -540,6 +549,7 @@
   <g id="layer-groups"></g>
   <g id="layer-arrows"></g>
   <g id="layer-shapes"></g>
+  <g id="layer-arrow-labels"></g>
 </svg>
 
 <script>
@@ -591,7 +601,7 @@
 var MODEL_EXAMPLES = {
 
   variance: {
-    claim: 'That these constructs explain variation in the outcome; nothing here claims one thing happened before another.',
+    claim: 'Constructs and the relationships between them, explaining variation in an outcome. Each arrow is a claim; a moderator says the relationship itself holds differently under some condition.',
     visual: {
       kind: 'schematic',
       alt: 'Antecedent leads to mechanism leads to outcome, with a moderator box whose arrow lands on the mechanism-to-outcome arrow rather than on a box.',
@@ -621,7 +631,7 @@ var MODEL_EXAMPLES = {
   },
 
   process: {
-    claim: 'That a single trigger can end in different outcomes; what varies is which pathway a case takes.',
+    claim: 'A path over time, where the ordering carries the argument. Branching by condition belongs here too \u2014 one mechanism can produce different outcomes depending on what holds. So do feedback loops and scope conditions.',
     visual: {
       kind: 'schematic',
       alt: 'A trigger leads to a mechanism, which branches into two different outcomes, each branch carrying a condition label.',
@@ -665,7 +675,7 @@ var MODEL_EXAMPLES = {
   },
 
   sequential: {
-    claim: 'That these events occur in this order, each following from the last; the boxes hold happenings, not variables.',
+    claim: 'Stages in order, with the ordering itself as part of the claim. Cases move through the same phases, but what happens inside a phase can differ.',
     visual: {
       kind: 'schematic',
       alt: 'Three numbered steps in one unbranching vertical chain ending in a terminal state, with two facilitating factors entering from the side at different transitions, each on an arrow marked plus.',
@@ -999,6 +1009,50 @@ function pickLabelAnchor(shapes, fromId, toId, x1, y1, x2, y2, lw, lh2, offsetDi
   return fallback;
 }
 
+// How far apart sibling arrows between the same pair of boxes are pushed.
+var ARROW_BULGE_STEP = 24;
+
+// Two arrows between the same pair of boxes land on exactly the same line
+// and hide each other -- and Drew is explicitly told to draw a feedback
+// loop as TWO opposing arrows, so this is the common case, not a corner
+// one. Grouping by endpoint pair and spreading the group around its own
+// centre separates them.
+function computeArrowOffsets(arrows){
+  var groups = {};
+  arrows.forEach(function(a){
+    var key = [a.from, a.to].slice().sort().join('|');
+    (groups[key] = groups[key] || []).push(a);
+  });
+  var offsets = {};
+  Object.keys(groups).forEach(function(key){
+    var list = groups[key];
+    var mid = (list.length - 1) / 2;
+    var canonicalFrom = key.split('|')[0];
+    list.forEach(function(a, i){
+      // arrowCurveGeometry derives its perpendicular from THIS arrow's own
+      // start->end direction, which flips sign when from/to is reversed
+      // relative to a sibling (exactly the forward/feedback case) -- without
+      // this correction that flip cancels the offset instead of separating
+      // the two curves, so they would still sit on the same line.
+      var sign = (a.from === canonicalFrom) ? 1 : -1;
+      offsets[a.id] = (i - mid) * sign;
+    });
+  });
+  return offsets;
+}
+
+// Given straight boundary-to-boundary endpoints and a bulge, returns the
+// curve's own midpoint (where a label belongs) and the quadratic control
+// point. bulge 0 means draw it straight, as before.
+function arrowCurveGeometry(pts, bulge){
+  var mx = (pts.x1+pts.x2)/2, my = (pts.y1+pts.y2)/2;
+  if(!bulge) return { mx:mx, my:my, control:null };
+  var dx = pts.x2-pts.x1, dy = pts.y2-pts.y1;
+  var len = Math.sqrt(dx*dx+dy*dy) || 1;
+  var px = -dy/len, py = dx/len;
+  return { mx: mx+px*bulge, my: my+py*bulge, control: { x: mx+px*bulge*2, y: my+py*bulge*2 } };
+}
+
 var ARROW_STYLE = {
   causal:       { dasharray:null,        markerEnd:'url(#mk-tri)',  markerStart:null },
   temporal:     { dasharray:null,        markerEnd:'url(#mk-open)', markerStart:null },
@@ -1090,58 +1144,89 @@ function renderShapes(snap){
   });
 }
 
-function renderArrows(snap){
+// Lines and labels are drawn in two passes into two layers, so every label
+// sits above every arrow AND above the shapes -- interleaved in one pass, a
+// label could end up underneath a line or box drawn after it.
+function renderArrowLines(snap){
   var layer = document.getElementById('layer-arrows');
   layer.innerHTML = '';
+  var offsets = computeArrowOffsets(snap.arrows);
   snap.arrows.forEach(function(a){
     var pts = arrowPoints(snap.shapes, snap.arrows, a);
     if(!pts) return;
     var style = ARROW_STYLE[a.type] || ARROW_STYLE.causal;
-    var g = svgEl('g', {});
-    var line = svgEl('line', {
-      x1:pts.x1, y1:pts.y1, x2:pts.x2, y2:pts.y2, class:'arrow-line',
-      'stroke-dasharray': style.dasharray, 'marker-end': style.markerEnd, 'marker-start': style.markerStart
-    });
-    g.appendChild(line);
-    if(a.label){
-      var dx = pts.x2-pts.x1, dy = pts.y2-pts.y1;
-      var lineLen = Math.sqrt(dx*dx + dy*dy) || 1;
-      var font = 'italic 11px -apple-system, sans-serif';
-      var angleInfo = lineLabelAngle(pts.x1, pts.y1, pts.x2, pts.y2);
+    var bulge = (offsets[a.id] || 0) * ARROW_BULGE_STEP;
+    var geo = arrowCurveGeometry(pts, bulge);
+    var el = geo.control
+      ? svgEl('path', {
+          d: 'M ' + pts.x1 + ' ' + pts.y1 + ' Q ' + geo.control.x + ' ' + geo.control.y + ' ' + pts.x2 + ' ' + pts.y2,
+          class:'arrow-line', fill:'none',
+          'stroke-dasharray': style.dasharray, 'marker-end': style.markerEnd, 'marker-start': style.markerStart
+        })
+      : svgEl('line', {
+          x1:pts.x1, y1:pts.y1, x2:pts.x2, y2:pts.y2, class:'arrow-line',
+          'stroke-dasharray': style.dasharray, 'marker-end': style.markerEnd, 'marker-start': style.markerStart
+        });
+    layer.appendChild(el);
+  });
+}
 
-      // The label always sits OFFSET above the line -- never centered on
-      // top of it -- and always rotates to match the line's own angle, no
-      // exemptions for near-vertical arrows -- one rule for every arrow,
-      // not "usually rotated, except sometimes." The rotated text's long
-      // axis runs parallel to the line regardless of that line's own
-      // direction, so the wrap width is always constrained by how long
-      // the arrow actually is (see wrapLabel above): a short arrow
-      // correctly forces a narrower, taller wrap.
-      var maxLabelWidth = Math.min(140, Math.max(46, lineLen*0.85));
-      var alines = wrapLabelBalanced(a.label, maxLabelWidth, font);
-      measureCtx.font = font;
-      var lw = Math.max.apply(null, alines.map(function(l){ return measureCtx.measureText(l).width; })) + 8;
-      var lh2 = alines.length*13 + 4;
+function renderArrowLabels(snap){
+  var layer = document.getElementById('layer-arrow-labels');
+  layer.innerHTML = '';
+  var offsets = computeArrowOffsets(snap.arrows);
+  snap.arrows.forEach(function(a){
+    if(!a.label) return;
+    var pts = arrowPoints(snap.shapes, snap.arrows, a);
+    if(!pts) return;
+    var dx = pts.x2-pts.x1, dy = pts.y2-pts.y1;
+    var lineLen = Math.sqrt(dx*dx + dy*dy) || 1;
+    var font = 'italic 11px -apple-system, sans-serif';
+    var angleInfo = lineLabelAngle(pts.x1, pts.y1, pts.x2, pts.y2);
+
+    // The label rotates to match the line's own angle, with no exemption
+    // for near-vertical arrows -- one rule for every arrow. The rotated
+    // text's long axis runs parallel to the line, so the wrap width is
+    // always constrained by how long the arrow actually is: a short arrow
+    // correctly forces a narrower, taller wrap.
+    var maxLabelWidth = Math.min(140, Math.max(46, lineLen*0.85));
+    var alines = wrapLabelBalanced(a.label, maxLabelWidth, font);
+    measureCtx.font = font;
+    var lw = Math.max.apply(null, alines.map(function(l){ return measureCtx.measureText(l).width; })) + 8;
+    var lh2 = alines.length*13 + 4;
+
+    var bulge = (offsets[a.id] || 0) * ARROW_BULGE_STEP;
+    var geo = arrowCurveGeometry(pts, bulge);
+    var mx, my;
+    if(geo.control){
+      // A curved arrow has already been pushed clear of its sibling, so the
+      // label belongs on the curve's own midpoint. Running the collision
+      // search here instead would slide it back along the straight chord
+      // and out from under its own line.
+      mx = geo.mx; my = geo.my;
+    } else {
+      // Straight arrow: offset to one side and shifted along the arrow's
+      // length to whichever position clears the other shapes.
       var anchor = pickLabelAnchor(snap.shapes, a.from, a.to, pts.x1, pts.y1, pts.x2, pts.y2, lw, lh2, lh2/2 + 4, angleInfo.deg);
-      var mx = anchor.x, my = anchor.y;
-      var rotateDeg = angleInfo.deg;
-
-      var labelGroup = svgEl('g', rotateDeg ? { transform:'rotate(' + rotateDeg.toFixed(2) + ' ' + mx.toFixed(2) + ' ' + my.toFixed(2) + ')' } : {});
-      var bg = svgEl('rect', { x:mx-lw/2, y:my-lh2/2, width:lw, height:lh2, class:'arrow-label-bg' });
-      labelGroup.appendChild(bg);
-      var lt = svgEl('text', { class:'arrow-label', 'text-anchor':'middle', 'dominant-baseline':'middle' });
-      renderTspans(lt, alines, mx, my);
-      labelGroup.appendChild(lt);
-      g.appendChild(labelGroup);
+      mx = anchor.x; my = anchor.y;
     }
-    layer.appendChild(g);
+    var rotateDeg = angleInfo.deg;
+
+    var labelGroup = svgEl('g', rotateDeg ? { transform:'rotate(' + rotateDeg.toFixed(2) + ' ' + mx.toFixed(2) + ' ' + my.toFixed(2) + ')' } : {});
+    var bg = svgEl('rect', { x:mx-lw/2, y:my-lh2/2, width:lw, height:lh2, class:'arrow-label-bg' });
+    labelGroup.appendChild(bg);
+    var lt = svgEl('text', { class:'arrow-label', 'text-anchor':'middle', 'dominant-baseline':'middle' });
+    renderTspans(lt, alines, mx, my);
+    labelGroup.appendChild(lt);
+    layer.appendChild(labelGroup);
   });
 }
 
 function renderToStage(snap){
   renderGroups(snap);
-  renderArrows(snap);
+  renderArrowLines(snap);
   renderShapes(snap);
+  renderArrowLabels(snap);
 }
 
 function computeContentBBox(shapes){
@@ -1462,9 +1547,22 @@ function buildAndSavePptx(shapes, arrows, onStatus){
   }
 
   var dashMap = { causal:'solid', temporal:'solid', conditional:'dash', feedback:'dashDot', coOccurrence:'sysDot' };
+  var pptxOffsets = computeArrowOffsets(arrows);
   arrows.forEach(function(a){
     var pts = arrowPoints(shapes, arrows, a);
     if(!pts) return;
+    // PowerPoint draws lines as straight shapes, so the on-screen curve
+    // becomes a parallel offset line here: siblings still separate, they
+    // just separate as straight lines rather than as curves. Without this a
+    // feedback pair exports stacked on top of itself, which is exactly the
+    // overlap the on-screen curve exists to prevent.
+    var pptxBulge = (pptxOffsets[a.id] || 0) * ARROW_BULGE_STEP;
+    if(pptxBulge){
+      var bdx = pts.x2-pts.x1, bdy = pts.y2-pts.y1;
+      var blen = Math.sqrt(bdx*bdx + bdy*bdy) || 1;
+      var box = (-bdy/blen)*pptxBulge, boy = (bdx/blen)*pptxBulge;
+      pts = { x1:pts.x1+box, y1:pts.y1+boy, x2:pts.x2+box, y2:pts.y2+boy };
+    }
     var x1=px(pts.x1), y1=py(pts.y1), x2=px(pts.x2), y2=py(pts.y2);
     slide.addShape(pptx.ShapeType.line, {
       x:Math.min(x1,x2), y:Math.min(y1,y2), w:Math.max(Math.abs(x2-x1),0.01), h:Math.max(Math.abs(y2-y1),0.01),
@@ -2551,6 +2649,7 @@ document.getElementById('intakeContinue').addEventListener('click', function(){
   var radios = document.querySelectorAll('#intakeModelType input[type=radio]');
   Array.prototype.forEach.call(radios, function(r){ if(r.checked) modelType = r.value; });
   var modelOther = document.getElementById('intakeModelOther').value.trim();
+  var relationships = document.getElementById('intakeRelationships').value.trim();
   var extra = document.getElementById('intakeExtra').value.trim();
 
   var intakeData = {
@@ -2569,6 +2668,7 @@ document.getElementById('intakeContinue').addEventListener('click', function(){
   var summary = 'Outcome: ' + outcomeDisplay(intakeData) + '.\n' +
     'What I think is explaining it: ' + factorsDisplay(intakeData) + '.\n' +
     "What sort of model I'm picturing: " + intakeModelLabel(intakeData) + '.';
+  if(relationships) summary += '\nHow I think those things relate to each other: ' + relationships;
   if(extra) summary += '\nAnything else worth knowing: ' + extra;
   if(intakeFileExtractedText){
     summary += '\nText pulled from an attached draft of the figure (' + intakeFileName + '):\n' + intakeFileExtractedText;
@@ -3084,6 +3184,7 @@ function wireExampleCards(){
    INIT
    ============================================================ */
 function init(){
+  attachDictation(document.getElementById('intakeRelationshipsMic'), document.getElementById('intakeRelationships'), document.getElementById('intakeRelationshipsMicStatus'), true);
   attachDictation(document.getElementById('intakeExtraMic'), document.getElementById('intakeExtra'), document.getElementById('intakeExtraMicStatus'), true);
   attachDictation(document.getElementById('micBtn'), document.getElementById('composerInput'), document.getElementById('composerMicStatus'), false);
   if(synthAvailable){ pickVoice('thea'); pickVoice('drew'); }
