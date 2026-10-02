@@ -1849,7 +1849,7 @@ function pushLog(entry){ chatLog.push(entry); renderChatFeed(); }
 function pushAssistant(persona, text){
   chatLog.push({ type:'assistant', persona:persona, text:text });
   renderChatFeed();
-  speak(text);
+  speak(text, persona);
 }
 
 function setSending(persona, v){
@@ -2204,12 +2204,87 @@ var currentUtterance = null; // kept in scope deliberately — some browsers dro
                               // speech mid-flight if the utterance is garbage
                               // collected before it finishes
 
-function speak(text){
+// Thea reads in a female-sounding voice, Drew in a male-sounding one.
+//
+// The Web Speech API exposes no gender attribute on a voice -- a
+// SpeechSynthesisVoice carries only name, lang, localService and default --
+// so there is nothing to query. The practical approach is to match against
+// the voice names that browsers and operating systems actually ship, most
+// preferred first, and cache whatever is found.
+//
+// Pitch is then set regardless of whether a named voice matched. On a
+// platform with two distinct voices it reinforces the difference; on one
+// with a single installed voice it is the ONLY thing keeping the two
+// personas apart, and every engine honours it. So voice selection degrades
+// rather than failing.
+var VOICE_PREFS = {
+  thea: {
+    names: ['Samantha', 'Victoria', 'Karen', 'Moira', 'Tessa', 'Fiona', 'Serena',
+            'Google UK English Female', 'Microsoft Zira', 'Microsoft Aria',
+            'Microsoft Jenny', 'Microsoft Michelle', 'Google US English'],
+    pitch: 1.15
+  },
+  drew: {
+    names: ['Daniel', 'Alex', 'Oliver', 'Rishi', 'Aaron', 'Fred', 'Gordon',
+            'Google UK English Male', 'Microsoft David', 'Microsoft Guy',
+            'Microsoft Christopher', 'Microsoft Mark'],
+    pitch: 0.8
+  }
+};
+var voiceCache = { thea: null, drew: null };
+
+function pickVoice(persona){
+  if(voiceCache[persona]) return voiceCache[persona];
+  var prefs = VOICE_PREFS[persona];
+  if(!prefs) return null;
+  var voices = [];
+  try{ voices = window.speechSynthesis.getVoices() || []; }
+  catch(e){ return null; }
+  if(!voices.length) return null; // not populated yet -- retry on the next utterance
+  // Prefer English voices so an unrelated localised voice doesn't win on a
+  // name substring; fall back to the full list if none are installed.
+  var english = voices.filter(function(v){ return /^en(-|_|$)/i.test(v.lang || ''); });
+  var pool = english.length ? english : voices;
+  for(var i=0;i<prefs.names.length;i++){
+    var want = prefs.names[i].toLowerCase();
+    for(var j=0;j<pool.length;j++){
+      if((pool[j].name || '').toLowerCase().indexOf(want) !== -1){
+        voiceCache[persona] = pool[j];
+        return pool[j];
+      }
+    }
+  }
+  return null; // searched a populated list, found nothing -- pitch alone carries it
+}
+
+// getVoices() returns an empty list until the engine has finished loading
+// them, and fires voiceschanged when it has. Without this the first reply of
+// a session would fall back to pitch-only on Chrome, then switch voices
+// partway through the conversation.
+if(synthAvailable && typeof window.speechSynthesis.addEventListener === 'function'){
+  window.speechSynthesis.addEventListener('voiceschanged', function(){
+    voiceCache.thea = null;
+    voiceCache.drew = null;
+    pickVoice('thea');
+    pickVoice('drew');
+  });
+}
+
+function speak(text, persona){
   if(!voiceEnabled || !synthAvailable || !text) return;
   try{
     window.speechSynthesis.cancel();
     currentUtterance = new SpeechSynthesisUtterance(text);
     currentUtterance.rate = 1;
+    var prefs = VOICE_PREFS[persona];
+    if(prefs){
+      currentUtterance.pitch = prefs.pitch;
+      var v = pickVoice(persona);
+      if(v){
+        currentUtterance.voice = v;
+        currentUtterance.lang = v.lang;
+      }
+    }
     window.speechSynthesis.speak(currentUtterance);
   } catch(e){ /* best-effort only */ }
 }
@@ -2306,6 +2381,7 @@ function attachDictation(btnEl, targetEl, statusEl, alwaysShow){
 function init(){
   attachDictation(document.getElementById('intakeExtraMic'), document.getElementById('intakeExtra'), document.getElementById('intakeExtraMicStatus'), true);
   attachDictation(document.getElementById('micBtn'), document.getElementById('composerInput'), document.getElementById('composerMicStatus'), false);
+  if(synthAvailable){ pickVoice('thea'); pickVoice('drew'); }
   showScreen('consent');
 }
 init();
