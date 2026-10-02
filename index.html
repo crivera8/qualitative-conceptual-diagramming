@@ -75,7 +75,7 @@
   }
   .screen-card{
     background:var(--paper); border:1px solid var(--rule); border-radius:8px;
-    box-shadow:0 18px 50px rgba(28,27,24,0.10); padding:32px 34px; max-width:480px; width:100%;
+    box-shadow:0 18px 50px rgba(28,27,24,0.10); padding:26px 30px; max-width:480px; width:100%;
     margin:auto;
   }
   .screen-card.wide{ max-width:620px; }
@@ -83,8 +83,8 @@
     font-family:var(--font-mono); font-size:11px; letter-spacing:0.08em; text-transform:uppercase;
     color:var(--ink-faint); margin:0 0 6px;
   }
-  .screen-title{ font-family:var(--font-display); font-size:26px; font-weight:600; margin:0 0 16px; line-height:1.2; }
-  .screen-lede{ font-size:13.5px; line-height:1.6; color:var(--ink-soft); margin:0 0 20px; }
+  .screen-title{ font-family:var(--font-display); font-size:26px; font-weight:600; margin:0 0 12px; line-height:1.2; }
+  .screen-lede{ font-size:13.5px; line-height:1.55; color:var(--ink-soft); margin:0 0 16px; }
   .consent-body p{ margin:0 0 12px; font-size:13.5px; line-height:1.6; color:var(--ink); }
   .consent-body ul{ margin:0 0 14px; padding-left:20px; font-size:13.5px; line-height:1.6; }
   .consent-body li{ margin-bottom:6px; }
@@ -101,9 +101,9 @@
   }
   .consent-check input{ margin-top:3px; flex:none; width:16px; height:16px; }
   .consent-fineprint{ font-size:11.5px; color:var(--ink-faint); margin:0 0 4px; line-height:1.5; }
-  .screen-actions{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:22px; flex-wrap:wrap; }
+  .screen-actions{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:18px; flex-wrap:wrap; }
 
-  .field-label{ display:block; font-size:13px; font-weight:600; color:var(--ink); margin:20px 0 6px; }
+  .field-label{ display:block; font-size:13px; font-weight:600; color:var(--ink); margin:14px 0 5px; }
   .field-label:first-of-type{ margin-top:4px; }
   .field-hint{ display:block; font-weight:400; font-size:12px; color:var(--ink-faint); margin-top:2px; }
   .field-input{
@@ -117,17 +117,18 @@
   .chip-row .field-input{ flex:1; }
   .chip-row .tbtn:disabled{ opacity:0.45; }
   .chip-list{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .chip-list:empty{ margin-top:0; }
   .chip{
     display:inline-flex; align-items:center; gap:6px; background:var(--paper-deep);
     border:1px solid var(--line); border-radius:14px; padding:4px 6px 4px 12px; font-size:12.5px; color:var(--ink);
   }
   .chip button{ border:none; background:none; color:var(--ink-faint); cursor:pointer; font-size:14px; line-height:1; padding:2px 4px; border-radius:50%; }
   .chip button:hover{ color:var(--danger); background:var(--danger-bg); }
-  .radio-group{ display:flex; flex-direction:column; gap:9px; }
-  .radio-group label{ display:flex; align-items:center; gap:9px; font-size:13px; color:var(--ink); cursor:pointer; }
+  .radio-group{ display:flex; flex-direction:column; gap:7px; }
+  .radio-group label{ display:flex; align-items:center; gap:9px; font-size:13px; line-height:1.4; color:var(--ink); cursor:pointer; }
   .radio-group input[type=radio]{ flex:none; width:15px; height:15px; margin-top:0; }
 
-  .check-inline{ display:flex; align-items:center; gap:6px; margin:7px 0 0; font-size:12px; color:var(--ink-soft); cursor:pointer; }
+  .check-inline{ display:flex; align-items:center; gap:6px; margin:5px 0 0; font-size:12px; color:var(--ink-soft); cursor:pointer; }
   .check-inline input{ width:14px; height:14px; }
 
   .field-row-mic{ display:flex; gap:8px; align-items:flex-start; }
@@ -136,7 +137,7 @@
 
   .persona-say{
     display:flex; gap:11px; align-items:flex-start; background:var(--white); border:1px solid var(--rule);
-    border-radius:8px; padding:13px 15px; margin-bottom:14px;
+    border-radius:8px; padding:11px 13px; margin-bottom:10px;
   }
   .persona-say.thea{ border-left:3px solid var(--thea); }
   .persona-say.drew{ border-left:3px solid var(--drew); }
@@ -167,7 +168,7 @@
   .mic-btn svg{ width:15px; height:15px; }
   .mic-btn[data-recording="true"]{ background:var(--danger); border-color:var(--danger); }
   .mic-btn[data-recording="true"] svg{ color:var(--white); }
-  .mic-status{ font-size:10.5px; color:var(--ink-faint); padding:3px 2px 0; min-height:14px; }
+  .mic-status{ font-size:10.5px; color:var(--ink-faint); padding:3px 2px 0; min-height:14px; margin:0; }
 
   /* ---------- Workspace: single chat ---------- */
   .app-shell{ display:flex; flex-direction:column; height:100vh; height:100dvh; min-height:0; }
