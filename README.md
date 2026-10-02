@@ -5,7 +5,9 @@ A thinking-and-drawing partner for building conceptual figures out of qualitativ
 - **Thea** does the conceptual work — what the constructs actually are, what job each arrow is doing, whether the relationships are specific enough to draw. She states her call and holds it unless given genuinely new information.
 - **Drew** turns settled decisions into boxes and arrows, and exports them as SVG, PNG or PowerPoint. There is no dragging: you tell him what to change and he redraws.
 
-See `CHANGELOG.md` for what has changed and why.
+See `CHANGELOG.md` for what has changed and why, and `PUBLISHING.md` for how to merge
+these changes into another copy of the repo and publish a running artifact from your own
+Claude account.
 
 ## Read this before you host it anywhere
 
