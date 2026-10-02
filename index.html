@@ -468,6 +468,10 @@
     </div>
     <p class="mic-status" id="intakeExtraMicStatus"></p>
 
+    <label class="field-label" for="intakeFileInput">Already have a draft of the figure?<span class="field-hint">Optional — attach a PDF or PowerPoint containing the figure you're drafting, and I'll pull out what readable text I can. It's the figure I need, not the whole paper.</span></label>
+    <input type="file" id="intakeFileInput" class="field-input" accept=".pdf,.pptx">
+    <p class="mic-status" id="intakeFileStatus"></p>
+
     <div class="screen-actions" style="justify-content:flex-end;">
       <button class="tbtn primary" id="intakeContinue" type="button">Thea thinks</button>
     </div>
@@ -2566,6 +2570,9 @@ document.getElementById('intakeContinue').addEventListener('click', function(){
     'What I think is explaining it: ' + factorsDisplay(intakeData) + '.\n' +
     "What sort of model I'm picturing: " + intakeModelLabel(intakeData) + '.';
   if(extra) summary += '\nAnything else worth knowing: ' + extra;
+  if(intakeFileExtractedText){
+    summary += '\nText pulled from an attached draft of the figure (' + intakeFileName + '):\n' + intakeFileExtractedText;
+  }
   callClaude('thea', summary);
 });
 
@@ -2746,6 +2753,143 @@ function attachDictation(btnEl, targetEl, statusEl, alwaysShow){
       active = false;
       btnEl.setAttribute('data-recording', 'false');
       setStatus("Couldn't start listening \u2014 you can still type.");
+    }
+  });
+}
+
+/* ============================================================
+   FIGURE DRAFT UPLOAD (PDF / PPTX) -- pulls readable text out of a draft
+   of the FIGURE as extra context for Thea. Not a manuscript reader: the
+   wording on the field says so, because testers read "draft" as "draft of
+   my article" and attached whole papers.
+
+   Both libraries are lazy-loaded only once a file is actually attached, and
+   both are on cdnjs, which the artifact CSP allows for scripts -- jszip to
+   unzip a .pptx, pdf.js to read .pdf text.
+
+   KNOWN, HARMLESS: pdf.js loads its worker from cdnjs too, and worker URLs
+   are NOT covered by the script allowlist, so inside a published artifact
+   the worker is blocked and pdf.js falls back to running on the main
+   thread. It logs "Warning: Setting up fake worker" when it does. Nothing
+   breaks -- extraction still works, just synchronously -- and the page
+   itself never surfaces that message.
+
+   If either library fails to load, or the file has no extractable text (a
+   scanned image of a figure, say), this degrades to a clear message rather
+   than a silent failure. Typing or dictating a description above always
+   works regardless.
+   ============================================================ */
+var JSZIP_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+var PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs';
+var PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.worker.min.mjs';
+var MAX_EXTRACTED_CHARS = 3000;
+
+var intakeFileExtractedText = '';
+var intakeFileName = '';
+var jszipLoadPromise = null;
+var pdfjsLoadPromise = null;
+
+function loadJSZip(){
+  if(window.JSZip) return Promise.resolve(window.JSZip);
+  if(jszipLoadPromise) return jszipLoadPromise;
+  jszipLoadPromise = new Promise(function(resolve, reject){
+    var sc = document.createElement('script');
+    sc.src = JSZIP_URL;
+    sc.onload = function(){ resolve(window.JSZip); };
+    sc.onerror = function(){ reject(new Error("couldn't load the .pptx reading library")); };
+    document.head.appendChild(sc);
+  });
+  return jszipLoadPromise;
+}
+
+function loadPdfJs(){
+  if(window.__pdfjsLib) return Promise.resolve(window.__pdfjsLib);
+  if(pdfjsLoadPromise) return pdfjsLoadPromise;
+  pdfjsLoadPromise = Promise.resolve()
+    .then(function(){ return import(PDFJS_URL); })
+    .then(function(lib){
+      lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+      window.__pdfjsLib = lib;
+      return lib;
+    })
+    .catch(function(){ throw new Error("couldn't load the .pdf reading library"); });
+  return pdfjsLoadPromise;
+}
+
+function decodeXmlEntities(str){
+  return str.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+            .replace(/&quot;/g,'"').replace(/&apos;/g,"'");
+}
+
+async function extractTextFromPptx(file){
+  var JSZip = await loadJSZip();
+  var buf = await file.arrayBuffer();
+  var zip = await JSZip.loadAsync(buf);
+  var slideNames = Object.keys(zip.files).filter(function(name){
+    return /^ppt\/slides\/slide\d+\.xml$/.test(name);
+  }).sort(function(a,b){
+    return parseInt(a.match(/slide(\d+)/)[1],10) - parseInt(b.match(/slide(\d+)/)[1],10);
+  });
+  var slideTexts = [];
+  for(var i=0;i<slideNames.length;i++){
+    var xml = await zip.files[slideNames[i]].async('string');
+    var runs = [];
+    var re = /<a:t>([^<]*)<\/a:t>/g;
+    var m;
+    while((m = re.exec(xml))){
+      var t = decodeXmlEntities(m[1]);
+      if(t.trim()) runs.push(t);
+    }
+    if(runs.length) slideTexts.push('Slide ' + (i+1) + ': ' + runs.join(' / '));
+  }
+  return slideTexts.join('\n');
+}
+
+async function extractTextFromPdf(file){
+  var pdfjsLib = await loadPdfJs();
+  var buf = await file.arrayBuffer();
+  var doc = await pdfjsLib.getDocument({ data: buf }).promise;
+  var pageTexts = [];
+  for(var i=1;i<=doc.numPages;i++){
+    var page = await doc.getPage(i);
+    var content = await page.getTextContent();
+    var text = content.items.map(function(it){ return it.str; }).join(' ').replace(/\s+/g,' ').trim();
+    if(text) pageTexts.push('Page ' + i + ': ' + text);
+  }
+  return pageTexts.join('\n');
+}
+
+function wireFigureUpload(){
+  var input = document.getElementById('intakeFileInput');
+  var statusEl = document.getElementById('intakeFileStatus');
+  if(!input || !statusEl) return;
+  input.addEventListener('change', async function(e){
+    var file = e.target.files[0];
+    intakeFileExtractedText = '';
+    intakeFileName = '';
+    if(!file){ statusEl.textContent = ''; return; }
+    var ext = (file.name.split('.').pop() || '').toLowerCase();
+    if(ext !== 'pdf' && ext !== 'pptx'){
+      statusEl.textContent = 'Please attach a .pdf or .pptx file.';
+      e.target.value = '';
+      return;
+    }
+    statusEl.textContent = 'Reading ' + file.name + '…';
+    try{
+      var text = ext === 'pptx' ? await extractTextFromPptx(file) : await extractTextFromPdf(file);
+      if(text && text.trim()){
+        if(text.length > MAX_EXTRACTED_CHARS) text = text.slice(0, MAX_EXTRACTED_CHARS) + '\n[...truncated]';
+        intakeFileExtractedText = text.trim();
+        intakeFileName = file.name;
+        var preview = intakeFileExtractedText.length > 140
+          ? intakeFileExtractedText.slice(0,140) + '…'
+          : intakeFileExtractedText;
+        statusEl.textContent = 'Pulled text from ' + file.name + ': "' + preview + '"';
+      } else {
+        statusEl.textContent = file.name + ' attached, but no readable text came out of it — if it’s mostly an image of the figure, describe it in a box above instead.';
+      }
+    } catch(err){
+      statusEl.textContent = "Couldn't read " + file.name + ' (' + err.message + ') — you can still describe it above.';
     }
   });
 }
@@ -2944,6 +3088,7 @@ function init(){
   attachDictation(document.getElementById('micBtn'), document.getElementById('composerInput'), document.getElementById('composerMicStatus'), false);
   if(synthAvailable){ pickVoice('thea'); pickVoice('drew'); }
   wireExampleCards();
+  wireFigureUpload();
   showScreen('consent');
 }
 init();
