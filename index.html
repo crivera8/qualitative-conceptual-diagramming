@@ -470,6 +470,8 @@ var placeCursor = { x:60, y:60 };
 function nextId(prefix){ idCounter++; return prefix + idCounter; }
 function findShape(id){ return state.shapes.filter(function(s){ return s.id===id; })[0]; }
 function findIn(list, id){ return list.filter(function(s){ return s.id===id; })[0]; }
+// An arrow endpoint is valid if it names a shape or another arrow.
+function anchorExists(id){ return !!findShape(id) || !!findIn(state.arrows, id); }
 
 /* ============================================================
    SHAPE CONSTRUCTION
@@ -618,11 +620,45 @@ function boundaryFor(s, tx, ty){
   return s.type==='ellipse' ? ellipseBoundary(s, tx, ty) : rectBoundary(s, tx, ty);
 }
 
-function computeEdgePoints(fromShape, toShape){
-  var toC = shapeCenter(toShape), fromC = shapeCenter(fromShape);
-  var p1 = boundaryFor(fromShape, toC.x, toC.y);
-  var p2 = boundaryFor(toShape, fromC.x, fromC.y);
+// An arrow endpoint normally names a shape, but it may also name ANOTHER
+// ARROW -- that is how a moderator attaches to a relationship rather than
+// to a variable, which is the shape that distinguishes a variance model
+// from a process or sequence figure. A shape anchor resolves to the shape
+// itself so the line can be trimmed to its boundary; an arrow anchor
+// resolves to a bare point at that arrow's midpoint.
+function resolveAnchor(shapes, arrows, id, depth){
+  var sh = findIn(shapes, id);
+  if(sh) return { shape: sh };
+  var ar = findIn(arrows, id);
+  if(!ar) return null;
+  var pts = arrowPoints(shapes, arrows, ar, depth + 1);
+  if(!pts) return null;
+  return { point: { x:(pts.x1 + pts.x2)/2, y:(pts.y1 + pts.y2)/2 } };
+}
+
+// The drawn endpoints of one arrow. Recursive, because an arrow may land on
+// another arrow's midpoint; depth-limited rather than cycle-tracked, since a
+// moderator of a moderator of a moderator is not a figure anyone should be
+// drawing and the limit also makes an accidental loop terminate.
+function arrowPoints(shapes, arrows, a, depth){
+  depth = depth || 0;
+  if(depth > 4) return null;
+  var A = resolveAnchor(shapes, arrows, a.from, depth);
+  var B = resolveAnchor(shapes, arrows, a.to, depth);
+  if(!A || !B) return null;
+  var aTarget = A.shape ? shapeCenter(A.shape) : A.point;
+  var bTarget = B.shape ? shapeCenter(B.shape) : B.point;
+  var p1 = A.shape ? boundaryFor(A.shape, bTarget.x, bTarget.y) : A.point;
+  var p2 = B.shape ? boundaryFor(B.shape, aTarget.x, aTarget.y) : B.point;
   return { x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y };
+}
+
+// True when this shape's job in the figure is to moderate a relationship:
+// it has at least one outgoing arrow that lands on another arrow.
+function isModeratorShape(arrows, shapeId){
+  return arrows.some(function(a){
+    return a.from === shapeId && !!findIn(arrows, a.to);
+  });
 }
 
 // An arrow label centered ON the line (the original behavior, in every
@@ -816,9 +852,8 @@ function renderArrows(snap){
   var layer = document.getElementById('layer-arrows');
   layer.innerHTML = '';
   snap.arrows.forEach(function(a){
-    var from = findIn(snap.shapes, a.from), to = findIn(snap.shapes, a.to);
-    if(!from || !to) return;
-    var pts = computeEdgePoints(from, to);
+    var pts = arrowPoints(snap.shapes, snap.arrows, a);
+    if(!pts) return;
     var style = ARROW_STYLE[a.type] || ARROW_STYLE.causal;
     var g = svgEl('g', {});
     var line = svgEl('line', {
@@ -1186,9 +1221,8 @@ function buildAndSavePptx(shapes, arrows, onStatus){
 
   var dashMap = { causal:'solid', temporal:'solid', conditional:'dash', feedback:'dashDot', coOccurrence:'sysDot' };
   arrows.forEach(function(a){
-    var from = findIn(shapes, a.from), to = findIn(shapes, a.to);
-    if(!from || !to) return;
-    var pts = computeEdgePoints(from, to);
+    var pts = arrowPoints(shapes, arrows, a);
+    if(!pts) return;
     var x1=px(pts.x1), y1=py(pts.y1), x2=px(pts.x2), y2=py(pts.y2);
     slide.addShape(pptx.ShapeType.line, {
       x:Math.min(x1,x2), y:Math.min(y1,y2), w:Math.max(Math.abs(x2-x1),0.01), h:Math.max(Math.abs(y2-y1),0.01),
@@ -1293,10 +1327,16 @@ function resyncGroupBounds(g){
 }
 
 function computeAutoLayout(targetIds){
-  var targets = (targetIds && targetIds.length)
+  var all = (targetIds && targetIds.length)
     ? state.shapes.filter(function(s){ return targetIds.indexOf(s.id) > -1 && s.type!=='group'; })
     : state.shapes.filter(function(s){ return s.type!=='group'; });
-  if(!targets.length) return { moved:0, layers:0 };
+  // A moderator has no forward arrow into the flow, so column layout would
+  // drop it in the first column beside the antecedent -- where it reads as
+  // just another antecedent. Hold it out of the columns and place it above
+  // the relationship it modifies once the columns are settled.
+  var moderators = all.filter(function(s){ return isModeratorShape(state.arrows, s.id); });
+  var targets = all.filter(function(s){ return moderators.indexOf(s) === -1; });
+  if(!targets.length && !moderators.length) return { moved:0, layers:0 };
   var idSet = {};
   targets.forEach(function(s){ idSet[s.id] = true; });
   var forwardArrows = state.arrows.filter(function(a){
@@ -1316,9 +1356,17 @@ function computeAutoLayout(targetIds){
   });
   var layerKeys = Object.keys(byLayer).map(Number).sort(function(a,b){ return a-b; });
   var colX = 80;
+  // Reserve a band above the flow when there are moderators, so the one
+  // placed over a relationship below has somewhere to go. Without this the
+  // flow starts at y=60, there is no room above it, and every moderator
+  // falls through to the below-the-line fallback.
+  var modGap = 80;
+  var topBand = moderators.length
+    ? Math.max.apply(null, moderators.map(function(m){ return m.h; })) + modGap
+    : 0;
   layerKeys.forEach(function(L){
     var col = byLayer[L];
-    var rowY = 60;
+    var rowY = 60 + topBand;
     col.forEach(function(s){
       s.x = colX;
       s.y = rowY;
@@ -1326,7 +1374,21 @@ function computeAutoLayout(targetIds){
     });
     colX += 260;
   });
-  return { moved: targets.length, layers: layerKeys.length };
+  // Centred over the midpoint of the relationship it modifies, clear above
+  // it. Measured after the columns are placed, so the midpoint is the real
+  // post-layout one.
+  moderators.forEach(function(m){
+    var link = state.arrows.filter(function(a){ return a.from === m.id && !!findIn(state.arrows, a.to); })[0];
+    var target = link && findIn(state.arrows, link.to);
+    var pts = target && arrowPoints(state.shapes, state.arrows, target);
+    if(!pts) return;
+    m.x = (pts.x1 + pts.x2)/2 - m.w/2;
+    m.y = Math.min(pts.y1, pts.y2) - m.h - modGap;
+    // Safety net for a moderator added without a fresh auto_layout: if the
+    // band above is not there, put it below rather than off-canvas.
+    if(m.y < 20) m.y = Math.max(pts.y1, pts.y2) + modGap;
+  });
+  return { moved: targets.length + moderators.length, layers: layerKeys.length };
 }
 
 function executeDrewTool(name, input){
@@ -1338,7 +1400,10 @@ function executeDrewTool(name, input){
         return { ok:true, id:shape.id, shape:shape };
       }
       case 'add_arrow': {
-        if(!findShape(input.from) || !findShape(input.to)) return { ok:false, error:'from/to must be existing shape ids' };
+        // "to" (and "from") may name a shape OR another arrow. Pointing at
+        // an arrow draws onto that relationship instead of onto a box.
+        if(!anchorExists(input.from) || !anchorExists(input.to)) return { ok:false, error:'from/to must be an existing shape id or arrow id' };
+        if(input.from === input.to) return { ok:false, error:'an arrow cannot start and end on the same element' };
         var arrow = { id: nextId('e'), from: input.from, to: input.to, label: input.label || '', type: input.type || 'causal' };
         state.arrows.push(arrow);
         return { ok:true, id:arrow.id, arrow:arrow };
@@ -1360,8 +1425,16 @@ function executeDrewTool(name, input){
         if(!a) return { ok:false, error:'no such arrow id' };
         if(input.label!=null) a.label = input.label;
         if(input.type!=null) a.type = input.type;
-        if(input.from!=null) a.from = input.from;
-        if(input.to!=null) a.to = input.to;
+        // Re-pointing an arrow is validated like creating one, so an edit
+        // cannot leave a relationship attached to something nonexistent.
+        if(input.from!=null){
+          if(!anchorExists(input.from) || input.from === a.id) return { ok:false, error:'from must be an existing shape id or arrow id' };
+          a.from = input.from;
+        }
+        if(input.to!=null){
+          if(!anchorExists(input.to) || input.to === a.id) return { ok:false, error:'to must be an existing shape id or arrow id' };
+          a.to = input.to;
+        }
         return { ok:true, arrow:a };
       }
       case 'delete_element': {
@@ -1374,7 +1447,14 @@ function executeDrewTool(name, input){
         }
         var aIdx = -1;
         for(var j=0;j<state.arrows.length;j++){ if(state.arrows[j].id===input.id){ aIdx=j; break; } }
-        if(aIdx > -1){ state.arrows.splice(aIdx,1); return { ok:true }; }
+        if(aIdx > -1){
+          state.arrows.splice(aIdx,1);
+          // A moderator pointed at the relationship just deleted has nothing
+          // left to land on, so it goes too -- the same rule shape deletion
+          // already applied to its own attached arrows.
+          state.arrows = state.arrows.filter(function(x){ return x.from!==input.id && x.to!==input.id; });
+          return { ok:true };
+        }
         return { ok:false, error:'no such id' };
       }
       case 'group_shapes': {
@@ -1572,10 +1652,13 @@ nobody should feel pushed toward a figure before the thinking underneath
 it is real.
 
 If their model-type answer was "variance-based," they're describing
-different cases or groups following different steps or relationships,
-producing variation in the outcome — check whether the figure needs to
-carry that variation explicitly (branches, a typology, moderating
-conditions) rather than flattening it into one path. If it was
+constructs and the relationships between them explaining variation in an
+outcome — the arrows carry the explanatory argument, not a time order.
+The matching shape is antecedent -> mechanism -> outcome, with any
+moderator attached to a relationship rather than to a box. Check that
+each arrow is doing explanatory work rather than smuggling in a sequence,
+and that a moderator is moderating a relationship rather than sitting in
+the flow as one more antecedent. If it was
 "process-based" or "sequential," that's a process/sequence figure,
 possibly with phases — check whether every case actually follows the same
 path or whether some of that variation is hiding underneath a claim of
@@ -1727,6 +1810,32 @@ guessing when a description is genuinely ambiguous (no clear direction, a
 box that could be one construct or two) — but don't ask about things you
 can reasonably decide yourself, like exact position or minor spacing.
 
+## The variance-model schematic
+
+If the researcher said on the intake screen that their model is
+variance-based, the shape that distinguishes it from a process or sequence
+figure is:
+
+  antecedent -> mechanism -> outcome
+
+with a moderator box whose arrow lands on the mechanism->outcome ARROW
+rather than on the outcome box. Draw that moderator arrow as type
+"conditional" and set its "to" to the arrow's id.
+
+This matters because a moderator pointed at a box instead reads as just
+another antecedent, which is exactly the misreading that makes a variance
+figure look like a process figure. In a variance model the arrows carry
+the explanatory argument, not a time order -- so resist the pull to
+lay it out as though earlier boxes happen before later ones.
+
+To build it in one response, give the mechanism->outcome add_arrow a
+tempId and point the moderator's "to" at that same tempId; it resolves to
+the real arrow id automatically:
+
+  { "tool": "add_shape", "tempId": "mech", "input": { "type": "roundRect", "label": "Mechanism" } },
+  { "tool": "add_arrow", "tempId": "link", "input": { "from": "mech", "to": "out", "label": "produces", "type": "causal" } },
+  { "tool": "add_arrow", "input": { "from": "mod", "to": "link", "label": "strengthens when high", "type": "conditional" } }
+
 ## Judgment calls you make
 - Arrow type from the language used. "Leads to," "causes," "drives" ->
   causal, one direction. "Over time," "eventually" -> consider whether
@@ -1778,7 +1887,7 @@ picture back to them in prose — just say what you did and why.
 
 Available actions and their input:
 - add_shape: { type: rect|roundRect|ellipse|text|group, label, x?, y?, width?, height? } — position and size are optional, omit them for a sensible default placement.
-- add_arrow: { from, to, label, type: causal|temporal|conditional|feedback|coOccurrence }
+- add_arrow: { from, to, label, type: causal|temporal|conditional|feedback|coOccurrence } — "from" and "to" normally name shapes, but "to" may also name ANOTHER ARROW's id, which draws this arrow onto that relationship instead of onto a box. That is how a moderator is drawn: it modifies the relationship, not the variable at the end of it. Use type "conditional" for a moderator arrow.
 - update_shape: { id, label?, type?, x?, y?, width?, height? }
 - update_arrow: { id, label?, type?, from?, to? }
 - delete_element: { id } — works for a shape or an arrow; deleting a shape also removes arrows connected to it.
@@ -1810,7 +1919,10 @@ function buildStateSummary(){
     return '  ' + s.id + ' [' + s.type + '] "' + s.label + '" at (' + Math.round(s.x) + ',' + Math.round(s.y) + ') size ' + Math.round(s.w) + 'x' + Math.round(s.h);
   }).join('\n');
   var arrowLines = state.arrows.map(function(a){
-    return '  ' + a.id + ': ' + a.from + ' -> ' + a.to + ' [' + a.type + '] "' + a.label + '"';
+    var ontoArrow = !findShape(a.to) && !!findIn(state.arrows, a.to);
+    return '  ' + a.id + ': ' + a.from + ' -> ' + a.to +
+      (ontoArrow ? ' (lands ON that relationship, not on a box)' : '') +
+      ' [' + a.type + '] "' + a.label + '"';
   }).join('\n');
   return 'Shapes:\n' + (shapeLines || '  (none)') + '\nArrows:\n' + (arrowLines || '  (none)');
 }
