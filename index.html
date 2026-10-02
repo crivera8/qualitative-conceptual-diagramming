@@ -2351,6 +2351,42 @@ function recentConv(){
   return conv.length > MAX_TURNS ? conv.slice(conv.length - MAX_TURNS) : conv;
 }
 
+// The sample capability's errors carry {code, message} and nothing else --
+// no retryAfter, no reset timestamp -- so there is no value to count down
+// from. Rather than invent one, which is exactly what a flat "wait a minute"
+// did, a duration is shown ONLY when the service's own message states one.
+//
+// The pattern deliberately requires BOTH a retry cue (retry / try again /
+// wait) and an in/after/within lead-in, within the same sentence. Looser
+// patterns misread the text in ways that would put a wrong number in front
+// of the reader -- the thing this is meant to fix:
+//   "a limit of 50 requests per minute"        -> "try again in 50 minutes"
+//   "you have sent 12 messages in 10 seconds"  -> "try again in 10 seconds"
+// Neither states a wait at all. Both now fall through to showing the
+// service's sentence as-is.
+function humanDuration(count, unit){
+  var v = parseInt(count, 10);
+  var u = unit.toLowerCase();
+  if(u.indexOf('ms') === 0 || u.indexOf('milli') === 0){
+    v = Math.max(1, Math.round(v / 1000)); u = 'second';   // sub-second reads better as 1 second
+  } else if(u.charAt(0) === 's') u = 'second';
+  else if(u.charAt(0) === 'm') u = 'minute';
+  else if(u.charAt(0) === 'h') u = 'hour';
+  return v + ' ' + u + (v === 1 ? '' : 's');
+}
+
+function rateLimitCopy(err){
+  var msg = (err && typeof err.message === 'string') ? err.message.trim() : '';
+  var when = msg.match(/\b(?:retry|try\s+again|wait)\b[^.]{0,24}?\b(?:in|after|within|for)\s+(\d+)\s*(milliseconds?|minutes?|seconds?|hours?|mins?|secs?|ms|[smh])\b/i);
+  if(when) return 'Too many requests right now — try again in ' + humanDuration(when[1], when[2]) + '.';
+  // A real sentence from the service beats our generic line; a bare error
+  // code or an empty message does not.
+  if(msg && /\s/.test(msg) && msg.toLowerCase().indexOf('rate_limited') === -1){
+    return 'Too many requests right now — ' + msg.replace(/\.+$/, '') + '.';
+  }
+  return 'Too many requests right now — wait a moment and try again. Your message was not sent.';
+}
+
 // Maps the capability's stable error codes to what a researcher should be
 // told. Returning null means "say nothing new" (a cancelled call).
 function sampleErrorCopy(err){
@@ -2358,7 +2394,7 @@ function sampleErrorCopy(err){
     case 'not_granted':
       return "Claude access wasn't allowed for this artifact -- reload the page and accept the prompt to talk to Thea and Drew.";
     case 'rate_limited':
-      return 'Too many requests right now -- wait a moment and try again.';
+      return rateLimitCopy(err);
     case 'refused':
       return "Claude declined to respond to that -- try rephrasing.";
     case 'empty_completion':
