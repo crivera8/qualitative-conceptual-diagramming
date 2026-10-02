@@ -2872,12 +2872,14 @@ function attachDictation(btnEl, targetEl, statusEl, alwaysShow){
    both are on cdnjs, which the artifact CSP allows for scripts -- jszip to
    unzip a .pptx, pdf.js to read .pdf text.
 
-   KNOWN, HARMLESS: pdf.js loads its worker from cdnjs too, and worker URLs
-   are NOT covered by the script allowlist, so inside a published artifact
-   the worker is blocked and pdf.js falls back to running on the main
-   thread. It logs "Warning: Setting up fake worker" when it does. Nothing
-   breaks -- extraction still works, just synchronously -- and the page
-   itself never surfaces that message.
+   ON THE WORKER: pdf.js loads its worker from cdnjs as well. Worker URLs
+   are not covered by the script allowlist, though pdf.js has its own
+   workaround for cross-origin workers (_createCDNWrapper, a blob that
+   dynamic-imports the real URL), so whether the worker loads inside a
+   published artifact has NOT been measured either way. If it does, nothing
+   to see. If it does not, pdf.js falls back to the main thread and
+   extraction still works, just synchronously -- and the warning it would
+   log in that case is suppressed at the getDocument call below.
 
    If either library fails to load, or the file has no extractable text (a
    scanned image of a figure, say), this degrades to a clear message rather
@@ -2953,7 +2955,18 @@ async function extractTextFromPptx(file){
 async function extractTextFromPdf(file){
   var pdfjsLib = await loadPdfJs();
   var buf = await file.arrayBuffer();
-  var doc = await pdfjsLib.getDocument({ data: buf }).promise;
+  var doc = await pdfjsLib.getDocument({
+    data: buf,
+    // Silences pdf.js's "Setting up fake worker" warning, which it logs when
+    // it cannot reach its worker and falls back to the main thread.
+    // Verified against the 6.3.289 source: warn() gates on a MODULE-GLOBAL
+    // level, setVerbosityLevel is not exported -- but getDocument calls
+    // setVerbosityLevel(verbosity) itself, and does so BEFORE it creates the
+    // worker, so this option reaches the check in time. ERRORS is kept so
+    // real failures still log; a failed extraction is reported to the reader
+    // on the status line regardless.
+    verbosity: (pdfjsLib.VerbosityLevel && pdfjsLib.VerbosityLevel.ERRORS) || 0
+  }).promise;
   var pageTexts = [];
   for(var i=1;i<=doc.numPages;i++){
     var page = await doc.getPage(i);
