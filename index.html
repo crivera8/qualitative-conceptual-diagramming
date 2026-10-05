@@ -2763,7 +2763,7 @@ var VOICE_PREFS = {
     names: ['Samantha', 'Victoria', 'Karen', 'Moira', 'Tessa', 'Fiona', 'Serena',
             'Google UK English Female', 'Microsoft Zira', 'Microsoft Aria',
             'Microsoft Jenny', 'Microsoft Michelle', 'Google US English'],
-    pitch: 1.15, pitchFallback: 1.6, rate: 1
+    pitch: 1.15, pitchFallback: 1.6, rate: 1, langFallback: 'en-US'
   },
   drew: {
     // macOS ships Daniel, Albert, Fred, Ralph, Rishi, and the newer
@@ -2773,7 +2773,12 @@ var VOICE_PREFS = {
             'Eddy', 'Grandpa', 'Rishi', 'Aaron', 'Fred', 'Gordon', 'Thomas',
             'Google UK English Male', 'Microsoft David', 'Microsoft Guy',
             'Microsoft Christopher', 'Microsoft Mark'],
-    pitch: 0.7, pitchFallback: 0.1, rateFallback: 0.9, rate: 0.95
+    // en-GB because the default voice for that locale is Daniel on macOS
+    // and a male voice on most Windows installs. Asking by LOCALE is the
+    // only steer left when getVoices() returns nothing: utterance.voice
+    // needs an object from a list we do not have, but lang is just a tag
+    // the engine resolves itself.
+    pitch: 0.7, pitchFallback: 0.1, rateFallback: 0.9, rate: 0.95, langFallback: 'en-GB'
   }
 };
 var voiceCache = { thea: null, drew: null };
@@ -2845,6 +2850,7 @@ function speak(text, persona){
         // again.
         currentUtterance.pitch = prefs.pitchFallback;
         if(prefs.rateFallback) currentUtterance.rate = prefs.rateFallback;
+        if(prefs.langFallback) currentUtterance.lang = prefs.langFallback;
       }
       if(currentUtterance.rate === 1 && prefs.rate) currentUtterance.rate = prefs.rate;
     }
@@ -2872,7 +2878,7 @@ function voiceDebugLine(){
     var v = pickVoice(persona), prefs = VOICE_PREFS[persona];
     return persona + ': ' + (v
       ? v.name + ' [' + v.lang + '] @' + prefs.pitch
-      : 'default @' + prefs.pitchFallback);
+      : 'default [' + (prefs.langFallback || '-') + '] @' + prefs.pitchFallback);
   }
   return 'voices: ' + voices.length + ' \u00b7 ' + part('thea') + ' \u00b7 ' + part('drew');
 }
@@ -2886,6 +2892,34 @@ function refreshVoiceDebug(){
 }
 
 window.addEventListener('hashchange', refreshVoiceDebug);
+
+/* Some engines only populate getVoices() after the first utterance has
+   actually been spoken, and voiceschanged does not always fire in a
+   sandboxed iframe. One listener is therefore not enough: this re-checks
+   for a few seconds after a user gesture, and stops the moment a list
+   appears or the budget runs out. Cheap, bounded, and silent when the list
+   never arrives. */
+var voicePollTimer = null;
+function pollForVoices(){
+  if(!synthAvailable || voicePollTimer) return;
+  var tries = 0;
+  voicePollTimer = setInterval(function(){
+    tries++;
+    var n = 0;
+    try{ n = (window.speechSynthesis.getVoices() || []).length; } catch(e){}
+    if(n > 0 || tries > 16){            // ~4s at 250ms
+      clearInterval(voicePollTimer);
+      voicePollTimer = null;
+      if(n > 0){
+        voiceCache.thea = null;
+        voiceCache.drew = null;
+        pickVoice('thea');
+        pickVoice('drew');
+      }
+      refreshVoiceDebug();
+    }
+  }, 250);
+}
 
 var voiceBtn = document.getElementById('voiceToggle');
 var voiceLabel = document.getElementById('voiceToggleLabel');
@@ -2908,6 +2942,8 @@ voiceBtn.addEventListener('click', function(){
       var primer = new SpeechSynthesisUtterance(' ');
       primer.volume = 0;
       window.speechSynthesis.speak(primer);
+      // Speaking is itself what makes some engines publish their voice list.
+      pollForVoices();
     } catch(e){ /* best-effort only */ }
   }
   if(!voiceEnabled){
