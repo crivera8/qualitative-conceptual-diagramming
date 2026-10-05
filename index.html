@@ -2781,10 +2781,30 @@ var VOICE_PREFS = {
     pitch: 0.7, pitchFallback: 0.1, rateFallback: 0.9, rate: 0.95, langFallback: 'en-GB'
   }
 };
+// The chosen voice is cached by NAME, not as an object. A
+// SpeechSynthesisVoice handed out by an earlier getVoices() call can stop
+// being honoured once the engine repopulates its list -- which happens here,
+// since the list arrives late and goes from 0 entries to 199. Re-resolving
+// the live object immediately before each utterance avoids speaking with a
+// stale reference that the engine silently ignores.
 var voiceCache = { thea: null, drew: null };
 
+function liveVoiceByName(name){
+  if(!name) return null;
+  var voices = [];
+  try{ voices = window.speechSynthesis.getVoices() || []; } catch(e){ return null; }
+  for(var i=0;i<voices.length;i++){
+    if(voices[i].name === name) return voices[i];
+  }
+  return null;
+}
+
 function pickVoice(persona){
-  if(voiceCache[persona]) return voiceCache[persona];
+  if(voiceCache[persona]){
+    var cached = liveVoiceByName(voiceCache[persona]);
+    if(cached) return cached;
+    voiceCache[persona] = null;   // it went away; fall through and search again
+  }
   var prefs = VOICE_PREFS[persona];
   if(!prefs) return null;
   var voices = [];
@@ -2799,7 +2819,7 @@ function pickVoice(persona){
   // would leave pitch doing all the work while looking like it had not.
   var taken = null;
   Object.keys(voiceCache).forEach(function(k){
-    if(k !== persona && voiceCache[k]) taken = voiceCache[k].name;
+    if(k !== persona && voiceCache[k]) taken = voiceCache[k];
   });
   for(var i=0;i<prefs.names.length;i++){
     var want = prefs.names[i].toLowerCase();
@@ -2807,7 +2827,7 @@ function pickVoice(persona){
       var name = pool[j].name || '';
       if(name === taken) continue;
       if(name.toLowerCase().indexOf(want) !== -1){
-        voiceCache[persona] = pool[j];
+        voiceCache[persona] = name;
         return pool[j];
       }
     }
@@ -2832,15 +2852,24 @@ if(synthAvailable && typeof window.speechSynthesis.addEventListener === 'functio
 function speak(text, persona){
   if(!voiceEnabled || !synthAvailable || !text) return;
   try{
-    window.speechSynthesis.cancel();
+    // Only cancel when there is something to cancel. An unconditional
+    // cancel() immediately before speak() makes some engines drop the
+    // voice assigned to the new utterance and fall back to the default --
+    // which is exactly the reported symptom: Drew assigned Daniel but
+    // heard as Samantha at a lower pitch.
+    if(window.speechSynthesis.speaking || window.speechSynthesis.pending){
+      window.speechSynthesis.cancel();
+    }
     currentUtterance = new SpeechSynthesisUtterance(text);
     currentUtterance.rate = 1;
     var prefs = VOICE_PREFS[persona];
     if(prefs){
       var v = pickVoice(persona);
       if(v){
+        // Deliberately NOT setting utterance.lang here. The voice already
+        // carries its locale, and setting lang alongside voice makes some
+        // engines re-select a voice by locale and discard the one assigned.
         currentUtterance.voice = v;
-        currentUtterance.lang = v.lang;
         currentUtterance.pitch = prefs.pitch;
       } else {
         // No voice list to choose from, so pitch and rate are the only
