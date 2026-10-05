@@ -2865,11 +2865,32 @@ function speak(text, persona){
    sandboxed artifact iframe, so the same build can behave differently in
    each and sound wrong in only one of them.
 
-   Gated on a HASH token, not a query string: a published artifact only
-   ever receives the fragment, so a ?debug=1 would never fire. Add #debug
-   to the artifact URL -- editing the hash on an already-open page is
-   enough, no reload needed. */
-function voiceDebugEnabled(){ return /(^|[#&])debug\b/.test(location.hash || ''); }
+   TRIGGERED BY A KEY CHORD: Ctrl+Alt+D.
+
+   A #debug hash does NOT work in a published artifact, which is what this
+   originally used. The page runs in an iframe on its own origin, loaded
+   from a URL the host builds -- complete with its own query string and no
+   fragment at all:
+
+     https://<id>.frame.claudeusercontent.com/_t?__frame_t=...&v=...
+
+   So a hash typed on the claude.ai address bar never reaches
+   location.hash in here, and the readout stayed hidden. Verified against
+   the live frame's markup. The hash is still honoured for the standalone
+   file opened directly, where it does work; the chord is what works
+   everywhere. */
+var voiceDebugForced = false;
+function voiceDebugEnabled(){
+  return voiceDebugForced || /(^|[#&])debug\b/.test(location.hash || '');
+}
+
+document.addEventListener('keydown', function(e){
+  if(e.ctrlKey && e.altKey && (e.key === 'd' || e.key === 'D')){
+    e.preventDefault();
+    voiceDebugForced = !voiceDebugForced;
+    refreshVoiceDebug();
+  }
+});
 
 function voiceDebugLine(){
   var voices = [];
