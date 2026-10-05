@@ -2884,11 +2884,20 @@ function voiceDebugEnabled(){
   return voiceDebugForced || /(^|[#&])debug\b/.test(location.hash || '');
 }
 
+function toggleVoiceDebug(){
+  voiceDebugForced = !voiceDebugForced;
+  refreshVoiceDebug();
+}
+
+// e.code, not e.key: on macOS holding Option rewrites the character, so
+// Alt+D arrives as e.key === "\u2202" and a check against 'd' never matches.
+// e.code is the physical key and is unaffected by modifiers or layout. The
+// e.key arm is kept for anything that does not report code.
 document.addEventListener('keydown', function(e){
-  if(e.ctrlKey && e.altKey && (e.key === 'd' || e.key === 'D')){
+  if(!(e.ctrlKey && e.altKey)) return;
+  if(e.code === 'KeyD' || e.key === 'd' || e.key === 'D' || e.key === '\u2202'){
     e.preventDefault();
-    voiceDebugForced = !voiceDebugForced;
-    refreshVoiceDebug();
+    toggleVoiceDebug();
   }
 });
 
@@ -2948,7 +2957,15 @@ if(!synthAvailable && !RecognitionCtor){
   voiceBtn.disabled = true;
   voiceBtn.title = "Voice isn't supported in this browser.";
 }
-voiceBtn.addEventListener('click', function(){
+voiceBtn.addEventListener('click', function(e){
+  // Shift-click shows the voice readout instead of toggling voice. A key
+  // chord only reaches this page if focus is already inside the artifact
+  // iframe; a click on this button necessarily is.
+  if(e.shiftKey){
+    e.preventDefault();
+    toggleVoiceDebug();
+    return;
+  }
   voiceEnabled = !voiceEnabled;
   voiceBtn.setAttribute('aria-pressed', String(voiceEnabled));
   voiceLabel.textContent = voiceEnabled ? 'Voice on' : 'Voice off';
