@@ -3390,7 +3390,16 @@ function init(){
   attachDictation(document.getElementById('intakeRelationshipsMic'), document.getElementById('intakeRelationships'), document.getElementById('intakeRelationshipsMicStatus'), true);
   attachDictation(document.getElementById('intakeExtraMic'), document.getElementById('intakeExtra'), document.getElementById('intakeExtraMicStatus'), true);
   attachDictation(document.getElementById('micBtn'), document.getElementById('composerInput'), document.getElementById('composerMicStatus'), false);
-  if(synthAvailable){ pickVoice('thea'); pickVoice('drew'); }
+  if(synthAvailable){
+    pickVoice('thea');
+    pickVoice('drew');
+    // Start polling at load, not only when the voice toggle is switched on.
+    // The list genuinely arrives late -- measured at 0 voices early and 199
+    // a moment later in the same published artifact -- so waiting for the
+    // toggle leaves a window where the first reply speaks with the
+    // pitch-only fallback and sounds wrong exactly once.
+    pollForVoices();
+  }
   refreshVoiceDebug();
   wireExampleCards();
   wireFigureUpload();
