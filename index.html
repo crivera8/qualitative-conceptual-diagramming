@@ -2740,18 +2740,32 @@ var currentUtterance = null; // kept in scope deliberately — some browsers dro
 // with a single installed voice it is the ONLY thing keeping the two
 // personas apart, and every engine honours it. So voice selection degrades
 // rather than failing.
+// `pitch` applies when a named voice of the right kind was actually found --
+// the voice is already carrying the difference, so pitch only reinforces it.
+// `pitchFallback` applies when no named voice could be found, which is the
+// case that matters: inside a sandboxed artifact iframe getVoices() can come
+// back empty, both personas fall through to the browser's single default
+// voice, and pitch becomes the ONLY thing distinguishing them. On a machine
+// whose default is female (Samantha on macOS), Drew at a timid 0.8 was simply
+// a slightly lower female voice. The fallback pitch is therefore dramatic
+// rather than polite, and the rate drops a little with it, since a slower
+// delivery reads lower too.
 var VOICE_PREFS = {
   thea: {
     names: ['Samantha', 'Victoria', 'Karen', 'Moira', 'Tessa', 'Fiona', 'Serena',
             'Google UK English Female', 'Microsoft Zira', 'Microsoft Aria',
             'Microsoft Jenny', 'Microsoft Michelle', 'Google US English'],
-    pitch: 1.15
+    pitch: 1.15, pitchFallback: 1.3, rate: 1
   },
   drew: {
-    names: ['Daniel', 'Alex', 'Oliver', 'Rishi', 'Aaron', 'Fred', 'Gordon',
+    // macOS ships Daniel, Albert, Fred, Ralph, Rishi, and the newer
+    // expressive Eddy/Reed/Rocko/Grandpa as male; Windows and Chrome
+    // equivalents follow.
+    names: ['Daniel', 'Alex', 'Oliver', 'Albert', 'Ralph', 'Reed', 'Rocko',
+            'Eddy', 'Grandpa', 'Rishi', 'Aaron', 'Fred', 'Gordon', 'Thomas',
             'Google UK English Male', 'Microsoft David', 'Microsoft Guy',
             'Microsoft Christopher', 'Microsoft Mark'],
-    pitch: 0.8
+    pitch: 0.7, pitchFallback: 0.4, rate: 0.95
   }
 };
 var voiceCache = { thea: null, drew: null };
@@ -2768,16 +2782,24 @@ function pickVoice(persona){
   // name substring; fall back to the full list if none are installed.
   var english = voices.filter(function(v){ return /^en(-|_|$)/i.test(v.lang || ''); });
   var pool = english.length ? english : voices;
+  // The other persona's voice is off limits: resolving both to the same one
+  // would leave pitch doing all the work while looking like it had not.
+  var taken = null;
+  Object.keys(voiceCache).forEach(function(k){
+    if(k !== persona && voiceCache[k]) taken = voiceCache[k].name;
+  });
   for(var i=0;i<prefs.names.length;i++){
     var want = prefs.names[i].toLowerCase();
     for(var j=0;j<pool.length;j++){
-      if((pool[j].name || '').toLowerCase().indexOf(want) !== -1){
+      var name = pool[j].name || '';
+      if(name === taken) continue;
+      if(name.toLowerCase().indexOf(want) !== -1){
         voiceCache[persona] = pool[j];
         return pool[j];
       }
     }
   }
-  return null; // searched a populated list, found nothing -- pitch alone carries it
+  return null; // nothing matched -- pitchFallback alone has to carry it
 }
 
 // getVoices() returns an empty list until the engine has finished loading
@@ -2801,12 +2823,16 @@ function speak(text, persona){
     currentUtterance.rate = 1;
     var prefs = VOICE_PREFS[persona];
     if(prefs){
-      currentUtterance.pitch = prefs.pitch;
       var v = pickVoice(persona);
       if(v){
         currentUtterance.voice = v;
         currentUtterance.lang = v.lang;
+        currentUtterance.pitch = prefs.pitch;
+      } else {
+        // No voice list to choose from, so pitch is the only signal left.
+        currentUtterance.pitch = prefs.pitchFallback;
       }
+      if(prefs.rate) currentUtterance.rate = prefs.rate;
     }
     window.speechSynthesis.speak(currentUtterance);
   } catch(e){ /* best-effort only */ }
