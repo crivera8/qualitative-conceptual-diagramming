@@ -2765,7 +2765,7 @@ var VOICE_PREFS = {
             'Eddy', 'Grandpa', 'Rishi', 'Aaron', 'Fred', 'Gordon', 'Thomas',
             'Google UK English Male', 'Microsoft David', 'Microsoft Guy',
             'Microsoft Christopher', 'Microsoft Mark'],
-    pitch: 0.7, pitchFallback: 0.4, rate: 0.95
+    pitch: 0.7, pitchFallback: 0.1, rateFallback: 0.9, rate: 0.95
   }
 };
 var voiceCache = { thea: null, drew: null };
@@ -2829,10 +2829,15 @@ function speak(text, persona){
         currentUtterance.lang = v.lang;
         currentUtterance.pitch = prefs.pitch;
       } else {
-        // No voice list to choose from, so pitch is the only signal left.
+        // No voice list to choose from, so pitch and rate are the only
+        // signals left. 0.4 was still read as a lower-pitched woman on a
+        // machine whose default voice is Samantha; the floor is 0, so this
+        // goes most of the way there rather than splitting the difference
+        // again.
         currentUtterance.pitch = prefs.pitchFallback;
+        if(prefs.rateFallback) currentUtterance.rate = prefs.rateFallback;
       }
-      if(prefs.rate) currentUtterance.rate = prefs.rate;
+      if(currentUtterance.rate === 1 && prefs.rate) currentUtterance.rate = prefs.rate;
     }
     window.speechSynthesis.speak(currentUtterance);
   } catch(e){ /* best-effort only */ }
