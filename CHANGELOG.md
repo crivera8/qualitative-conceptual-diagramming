@@ -4,7 +4,7 @@ Changes to `index.html` (the Figure Creation Agent — Thea & Drew).
 
 ## 2026-10-05
 
-Fourteen commits: a voice bug that took four wrong theories to pin down, the
+Sixteen commits: a voice bug that took four wrong theories to pin down, the
 example cards reassigned across the three model types, and some copy.
 
 ### The voice bug
@@ -74,6 +74,22 @@ Thea's raised (`0dba26d`).
 - **Lee & Young-Hyman's actual Figure 1 embedded** (`aa5c02e`), replacing
   "cited and linked only". See the licence section below — this one is not
   on the same footing as Sayegh's.
+
+### Intake
+
+- **A unit-of-analysis field** on the intake screen: "What is the unit of
+  analysis?", with "e.g., individual, group, organization" as the hint, and
+  a plain text box. It sits between "How do those things relate to each
+  other?" and "What sort of model do you think this is?".
+
+  In the summary sent to Thea it is placed immediately **before** the model
+  line rather than appended with the other optional fields, because the
+  Process-based option is defined as "without a focus on variance across
+  units of analysis" — Thea has to read the two together to say anything
+  useful about which model type fits. It also appears in the one-line
+  receipt in the feed. Optional, like the other free-text fields: when it is
+  left blank both the summary line and the receipt segment drop out
+  entirely.
 
 ### Copy
 

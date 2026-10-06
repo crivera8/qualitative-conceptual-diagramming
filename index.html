@@ -451,6 +451,9 @@
     </div>
     <p class="mic-status" id="intakeRelationshipsMicStatus"></p>
 
+    <label class="field-label" for="intakeUnit">What is the unit of analysis?<span class="field-hint">e.g., individual, group, organization.</span></label>
+    <input type="text" id="intakeUnit" class="field-input">
+
     <label class="field-label">What sort of model do you think this is?</label>
     <div class="radio-group" id="intakeModelType">
       <div class="radio-row">
@@ -2745,11 +2748,13 @@ document.getElementById('intakeContinue').addEventListener('click', function(){
   Array.prototype.forEach.call(radios, function(r){ if(r.checked) modelType = r.value; });
   var modelOther = document.getElementById('intakeModelOther').value.trim();
   var relationships = document.getElementById('intakeRelationships').value.trim();
+  var unit = document.getElementById('intakeUnit').value.trim();
   var extra = document.getElementById('intakeExtra').value.trim();
 
   var intakeData = {
     outcome: outcome, outcomeUnsure: outcomeUnsure,
     factors: intakeFactors.slice(), factorsUnsure: factorsUnsure,
+    unit: unit,
     modelType: modelType, modelOther: modelOther, extra: extra
   };
 
@@ -2757,12 +2762,19 @@ document.getElementById('intakeContinue').addEventListener('click', function(){
   updateNudge('thea');
 
   pushLog({ type:'tool', text:
-    'Outcome: ' + outcomeDisplay(intakeData) + '  \u00b7  Explaining: ' + factorsDisplay(intakeData) + '  \u00b7  Model: ' + intakeModelLabel(intakeData)
+    'Outcome: ' + outcomeDisplay(intakeData) + '  \u00b7  Explaining: ' + factorsDisplay(intakeData) +
+    (unit ? '  \u00b7  Unit: ' + unit : '') +
+    '  \u00b7  Model: ' + intakeModelLabel(intakeData)
   });
 
   var summary = 'Outcome: ' + outcomeDisplay(intakeData) + '.\n' +
-    'What I think is explaining it: ' + factorsDisplay(intakeData) + '.\n' +
-    "What sort of model I'm picturing: " + intakeModelLabel(intakeData) + '.';
+    'What I think is explaining it: ' + factorsDisplay(intakeData) + '.\n';
+  // Immediately before the model line, not appended with the other optional
+  // fields: the Process-based option is defined as "without a focus on
+  // variance across units of analysis", so Thea needs to read these two
+  // together to say anything useful about the model type.
+  if(unit) summary += 'My unit of analysis: ' + unit + '.\n';
+  summary += "What sort of model I'm picturing: " + intakeModelLabel(intakeData) + '.';
   if(relationships) summary += '\nHow I think those things relate to each other: ' + relationships;
   if(extra) summary += '\nAnything else worth knowing: ' + extra;
   if(intakeFileExtractedText){
