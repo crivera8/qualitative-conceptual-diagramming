@@ -32,7 +32,9 @@ It should merge cleanly — the commits sit directly on top of your `d237fd7`, a
 
 **1. One bug predates all of this and was in your copy too.** Ticking the consent box and pressing Continue appeared to do nothing: the intake screen *was* shown, but centred flex overflow put its top 326px above the scrollable area, where `scrollTop` cannot reach. It overflowed on ordinary desktop windows, not just small ones. Fixed in `33f3bb3`.
 
-**2. The process example card's description and its drawing disagree, on purpose.** The option still reads "one shared sequence … in roughly the same way for everyone" while the schematic branches to two different outcomes. The descriptions were briefly rewritten to match and then restored at Chris's direction, on the grounds that a branching model is still a process model and that is precisely the misreading the card exists to correct. It will look like a bug; it isn't. See `00295c5`.
+**2. The process card has no drawing, on purpose.** It shows the published figure and its citation, and nothing else. Every other card pairs a schematic we drew with a claim line; this one doesn't, because Lee & Young-Hyman's Figure 1 already shows the branching-over-time signature a schematic would have taught, on real constructs rather than on Trigger/Mechanism placeholders. A drawing above it was saying the same thing twice. If you are comparing the three cards and this one looks unfinished, that is why.
+
+(History, in case you hit it in the changelog: this card used to carry a schematic whose branching **contradicted** its own option text, which then read "one shared sequence … in roughly the same way for everyone". The option was reworded in `cc83559` and the schematic is now gone, so that contradiction no longer exists either way.)
 
 **3. Two published figures are embedded in the page, on different permissions.** Sayegh's Figure 1 is on the variance card, Lee & Young-Hyman's on the process card, each with attribution rendered beside it. The licence position of every example is recorded in a comment next to `MODEL_EXAMPLES` in `index.html`, and they are **not** the same:
 

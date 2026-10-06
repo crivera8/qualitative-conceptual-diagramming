@@ -4,7 +4,7 @@ Changes to `index.html` (the Figure Creation Agent — Thea & Drew).
 
 ## 2026-10-05
 
-Sixteen commits: a voice bug that took four wrong theories to pin down, the
+Seventeen commits: a voice bug that took four wrong theories to pin down, the
 example cards reassigned across the three model types, and some copy.
 
 ### The voice bug
@@ -74,6 +74,24 @@ Thea's raised (`0dba26d`).
 - **Lee & Young-Hyman's actual Figure 1 embedded** (`aa5c02e`), replacing
   "cited and linked only". See the licence section below — this one is not
   on the same footing as Sayegh's.
+- **The process card reduced to that figure alone.** Its schematic (Trigger
+  → Mechanism → Outcome A/B) and its claim line both went. The published
+  figure already shows the branching-over-time signature the schematic was
+  there to teach, and shows it on real constructs rather than on
+  placeholders, so the drawing was making the same point twice and less
+  well. Switched to `kind:'reproduction'`, which already existed for exactly
+  this — the figure becomes the card's visual rather than sitting beneath a
+  schematic — so it was a data change plus making `claim` optional in
+  `exampleCardHTML`. **The process card is now the only one with no drawing
+  and no claim line**; the note beside `MODEL_EXAMPLES` about each type
+  having a visual signature still applies, but for process that signature
+  has to be read off the real figure.
+
+  This also retires, for good, the deliberate description/drawing
+  contradiction recorded under 2026-10-02 below: the option was reworded in
+  `cc83559` and there is now no drawing to disagree with it. The note in
+  `PUBLISHING.md` that warned Vanessa about it had gone stale on both
+  counts and has been rewritten.
 
 ### Intake
 
