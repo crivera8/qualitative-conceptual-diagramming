@@ -2,6 +2,119 @@
 
 Changes to `index.html` (the Figure Creation Agent — Thea & Drew).
 
+## 2026-10-05
+
+Fourteen commits: a voice bug that took four wrong theories to pin down, the
+example cards reassigned across the three model types, and some copy.
+
+### The voice bug
+
+Thea was meant to read in a female-sounding voice and Drew in a male one.
+Drew kept sounding like Samantha. Four explanations were tried and three of
+them were wrong, which is worth recording so they are not tried again:
+
+- *"The sandbox exposes no voice list."* Wrong. A readout added to measure
+  it reported **199** voices, and resolved Drew to Daniel [en-GB]
+  (`eeab159`). The list is simply populated **late** — 0 voices early, 199
+  a moment later in the same frame. `voiceschanged` alone did not surface
+  them; a poll did, and it now starts at page load rather than when voice
+  mode is switched on, so a first reply no longer speaks with the
+  pitch-only fallback exactly once.
+- *A `#debug` hash would show the readout* (`81591d5`). It can never fire:
+  the artifact iframe's `src` carries a query string and no fragment, so no
+  hash ever reaches the page. Replaced with a key chord.
+- *Ctrl+Alt+D as `e.key === 'd'`* (`5c8fe8f`). On macOS, Option rewrites
+  `e.key` to `'∂'`. Matched on `e.code === 'KeyD'` instead, and added
+  Shift-click on the Voice button, since a chord also needs focus inside
+  the iframe.
+
+The actual cause was three separate things, all present, all fixed together
+in `d1fc4e5` rather than guessing which one mattered:
+
+1. **A stale voice object.** The chosen `SpeechSynthesisVoice` was cached
+   as an object from an earlier `getVoices()` call. When the engine
+   repopulates its list, a handle from the previous list is silently
+   ignored. The cache now holds the voice **name** and re-resolves the live
+   object immediately before each utterance.
+2. **An unconditional `cancel()`.** `speak()` called
+   `speechSynthesis.cancel()` before every utterance, including when
+   nothing was speaking — which makes some engines drop the voice on the
+   new utterance and fall back to the default. It now cancels only when
+   speaking or pending.
+3. **`lang` set alongside `voice`.** Setting `utterance.lang` next to
+   `utterance.voice` makes some engines re-select by locale and discard the
+   assigned voice. The voice already carries its locale, so `lang` is set
+   only in the no-voice fallback, where it is the only steer available.
+
+Pitch was also pushed apart so the two stay distinguishable where only one
+voice is installed: Drew's fallback to 0.1 (`02fa367`, `17aeef3`) and
+Thea's raised (`0dba26d`).
+
+### Example cards reassigned
+
+- **Two model-type options reworded** (`cc83559`). Process-based is now
+  "things unfold or lead to each other, without a focus on variance across
+  units of analysis"; Sequential is "a series of stages that unfolds across
+  time, though the exact steps may differ slightly across actors".
+- **The examples moved** (`cc83559`). Sayegh went from the process card to
+  the **variance** card, bringing its embedded Figure 1 with it — still
+  permitted, since CC BY does not care which card it sits on. Lee &
+  Young-Hyman (2026) became the process example. **Sequential lost its chip
+  entirely:** there is no published example for it, and Tilcsik is not open
+  access. Its entry is kept rather than deleted, because the schematic and
+  claim line are still wanted; only the missing example is the reason the
+  card is not shown.
+- **One note per figure, not two** (`1956ea3`). The variance card described
+  the same figure twice — a caption under the image and a citation line
+  below it. The caption went. The **licence did not**: CC BY requires
+  attribution naming the licence, and the caption was the only place it
+  appeared, so the citation line now carries it. `figureBlockHTML` renders
+  a `figcaption` only when there is credit text for it, so a future figure
+  that needs its own caption still gets one.
+- **Lee & Young-Hyman's actual Figure 1 embedded** (`aa5c02e`), replacing
+  "cited and linked only". See the licence section below — this one is not
+  on the same footing as Sayegh's.
+
+### Copy
+
+- **A sign-in notice on the consent screen** (`4ee0d42`), cut to a single
+  sentence (`ba5798d`): "You'll need to be signed in to Claude to use this
+  tool." It sits before "Where your words go".
+- **The intake lede's opening sentence** (`5a1c8d9`) now reads "This AI tool
+  is designed to help management researchers with qualitative data develop
+  figures for their research."
+
+### Licences — a fourth state, and the first conditional one
+
+The licence notes beside `MODEL_EXAMPLES` now record four papers in four
+states, including the two no longer displayed. The one that changes how
+this repo has to be handled from here on:
+
+**Lee & Young-Hyman is CC BY-NC 4.0**, and its Figure 1 is embedded. That
+is not the same permission as Sayegh's CC BY. NonCommercial makes the embed
+**conditional on how this tool is distributed** — it is permitted because
+the tool is given away free as a research companion. If it is ever sold,
+bundled into something sold, or used to promote a commercial offering, that
+figure has to come out; Sayegh's would not. Nothing in the page enforces
+this, so it travels in the licence comment and in `README.md`.
+
+Two things that make this easy to get wrong. The licence is **not printed
+in the article PDF at all** — page 1 carries only SAGE's standard "Article
+reuse guidelines" line, which on its own reads as all-rights-reserved — so
+the permission rests on the publisher's own CrossRef deposit for the version
+of record, checked 2026-10-05. And the figure's two upside-down "supports"
+labels are set that way in the published original: the page is printed
+rotated 90° and is rotated back as a whole, so every label keeps its
+original orientation.
+
+On encoding it: 300dpi from page 32, kept at its native 2531×1621 and
+reduced to a 128-colour palette, 180KB. **Downscaling first made the file
+larger** — 1800px wide came out at 228KB — because resampling smears
+antialiasing across flat line art that otherwise compresses cleanly. Worth
+remembering before resizing the next one.
+
+---
+
 ## 2026-10-02
 
 Sixteen commits. Grouped by what they touch rather than by commit order.

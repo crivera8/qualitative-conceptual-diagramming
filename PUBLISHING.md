@@ -2,13 +2,13 @@
 
 Written for Vanessa. Two separate jobs: get the code into your repo, then publish a running artifact from your own Claude account so the link belongs to you.
 
-Read `CHANGELOG.md` first if you want to know what changed and why — it covers all seventeen commits, with the reasoning.
+Read `CHANGELOG.md` first if you want to know what changed and why — every commit is there with its reasoning.
 
 ---
 
 ## Part 1 — merge the changes into your repo
 
-Seventeen commits, five files: `index.html`, `README.md`, `CHANGELOG.md`, `PUBLISHING.md`, and `figures/sayegh-2025-figure1.png` (a binary, 180KB).
+Six files: `index.html`, `README.md`, `CHANGELOG.md`, `PUBLISHING.md`, and two binaries in `figures/` — `sayegh-2025-figure1.png` and `lee-younghyman-2026-figure1.png` (180KB each).
 
 ### If there's an open pull request
 
@@ -34,13 +34,18 @@ It should merge cleanly — the commits sit directly on top of your `d237fd7`, a
 
 **2. The process example card's description and its drawing disagree, on purpose.** The option still reads "one shared sequence … in roughly the same way for everyone" while the schematic branches to two different outcomes. The descriptions were briefly rewritten to match and then restored at Chris's direction, on the grounds that a branching model is still a process model and that is precisely the misreading the card exists to correct. It will look like a bug; it isn't. See `00295c5`.
 
-**3. A published figure is embedded in the page.** Sayegh's Figure 1 is reproduced on the process card under CC BY 4.0, with attribution rendered beside it. The licence position of all three examples is recorded in a comment next to `MODEL_EXAMPLES` in `index.html`, and they are **not** the same:
+**3. Two published figures are embedded in the page, on different permissions.** Sayegh's Figure 1 is on the variance card, Lee & Young-Hyman's on the process card, each with attribution rendered beside it. The licence position of every example is recorded in a comment next to `MODEL_EXAMPLES` in `index.html`, and they are **not** the same:
 
 | Example | Status |
 |---|---|
-| Sayegh (process) | Confirmed CC BY 4.0 — reproduced here with attribution |
-| Shen (variance) | Confirmed CC BY — *could* be reproduced, deliberately isn't |
-| Tilcsik (sequential) | **Not** open access — cite and link only, never reproduce |
+| Sayegh (variance) | Confirmed CC BY 4.0 — reproduced here with attribution |
+| Lee & Young-Hyman (process) | CC BY-**NC** 4.0 — reproduced here, *conditional on non-commercial distribution* |
+| Shen (not shown) | Confirmed CC BY — *could* be reproduced, deliberately isn't |
+| Tilcsik (not shown) | **Not** open access — cite and link only, never reproduce |
+
+The NonCommercial one is worth a moment of your attention, because it is the only thing here that can change after publication. Lee & Young-Hyman's figure is embedded because this tool is given away free. If it ever stops being free — sold, bundled into something sold, or used to promote a commercial offering — that figure has to come out. Sayegh's would not. Nothing in the page enforces this; it is a decision that travels with the licence note in the code.
+
+(Its licence comes from the publisher's CrossRef deposit, not the article PDF, which prints no licence at all — page 1 carries only SAGE's standard "Article reuse guidelines" line. Checked 2026-10-05.)
 
 ---
 
