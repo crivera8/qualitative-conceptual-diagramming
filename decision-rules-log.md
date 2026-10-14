@@ -71,6 +71,34 @@ checked, and the size and SHA-256 of `index.html` after the change.
   `1edc5cca1fbdb8a3462dd647e8711d1ae7634b952915a36abe339a692737d0e2`.
 - **Enforced by:** page edit only. No effect on prompts to Claude, the diagrams or exports.
 
+### R3. A rate limit gets one request and the service's own wording, no auto-retry (TD-08)
+
+- **Rule:** One send makes one request to Claude. When the service rejects it for a rate
+  limit, the page shows a wait only if the service's message states one; otherwise it shows
+  the service's sentence; otherwise "Too many requests right now — wait a moment and try
+  again. Your message was not sent." No number is invented, and nothing is retried
+  automatically.
+- **Why:** A tester found retrying after a rate limit self-defeating. The tracker's
+  diagnosis was of `requestClaude` in an older build (`old/index.html`, no longer in the
+  repo), which retried once 1.5 seconds after a 429, so one send became two requests.
+- **No change in this log entry.** The current build already meets the rule, since commit
+  `823b3b1` (Oct 2): `callClaude` calls `sampleFn` once with no timer or retry, and
+  `rateLimitCopy` builds the message as above. This entry records that TD-08 needs no
+  further edit.
+- **Checks (Oct 14, against stand-in errors, not live):** `rateLimitCopy` and
+  `sampleErrorCopy` were taken from `index.html` and run in Node on eight `rate_limited`
+  errors. "Try again in 2 minutes." gave "try again in 2 minutes"; "Retry after 500ms" gave
+  "try again in 1 second"; "50 requests per minute exceeded" and "you have sent 12 messages
+  in 10 seconds" were shown as written, with no wait; "12 requests in 10s; try again in
+  60 s" gave "try again in 60 seconds"; "rate_limited", an empty message and a missing one
+  gave the fallback line. `callClaude` contains one `sampleFn` call and no `setTimeout` or
+  retry.
+- **Not checked:** a real rate-limit error from the `sample` capability (blocked by TD-20),
+  so the service's actual wording is not known.
+- **Main page:** unchanged, `index.html`, 655236 bytes, SHA-256
+  `1edc5cca1fbdb8a3462dd647e8711d1ae7634b952915a36abe339a692737d0e2` (as after R2).
+- **Enforced by:** `callClaude` and `rateLimitCopy` in `index.html`.
+
 ---
 
 ## Open items
@@ -78,6 +106,11 @@ checked, and the size and SHA-256 of `index.html` after the change.
 1. `README.md`, `PUBLISHING.md`, an older changelog entry and the git history still name
    the authors. Decide whether the submission needs them removed too (same as Casting
    Call open item 37).
+2. A failed request leaves the reader's message in the conversation. `callClaude` adds it
+   before the request and does not remove it on an error, so it goes out with the next
+   request. The fallback line "Your message was not sent" is then only half true, and a
+   reader who retypes the message sends it twice. Found while checking TD-08; not in its
+   scope. To be raised as its own tracker item.
 
 ## History
 
@@ -85,6 +118,7 @@ checked, and the size and SHA-256 of `index.html` after the change.
 | --- | --- | --- | --- |
 | Oct 14, 2026 | R1 | Authors' names and emails removed from the consent notice | TD-21 |
 | Oct 14, 2026 | R2 | Try-another-browser note added under the sign-in notice | TD-10 |
+| Oct 14, 2026 | R3 | Recorded that the rate-limit handling already meets TD-08 (`823b3b1`); no page change | TD-08 |
 
 ## Considered, not built
 
