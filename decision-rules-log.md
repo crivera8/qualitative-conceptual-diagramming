@@ -38,7 +38,8 @@ checked, and the size and SHA-256 of `index.html` after the change.
   opening `<p>` than closing `</p>` both before and after, so the edit did not cause it);
   rendered in headless Chrome, both versions load with no console errors and the consent
   Continue button is present.
-- **Not checked:** the page in a published artifact (blocked by TD-20).
+- **Published test (Oct 14):** the consent notice ends at "Check journal policy" with no
+  names. See Test results.
 - **Not changed:** `README.md` (its Contact section, names and emails), `PUBLISHING.md`
   and one older `CHANGELOG.md` entry (a first name each), and the git history still name
   the authors. So do any copies already published.
@@ -65,6 +66,7 @@ checked, and the size and SHA-256 of `index.html` after the change.
 
 - **Checks:** one line added and nothing else changed; rendered in headless Chrome, the page
   loads with no console errors and the note shows as the second line of the consent screen.
+- **Published test (Oct 14):** the note shows under the sign-in notice. See Test results.
 - **Not checked:** whether another browser in fact fixes a failed PDF load. The note is
   guidance; TD-11 (configuring the PDF.js worker) is the fix for the warning itself.
 - **Main page after this change:** `index.html`, 655236 bytes, SHA-256
@@ -93,8 +95,8 @@ checked, and the size and SHA-256 of `index.html` after the change.
   60 s" gave "try again in 60 seconds"; "rate_limited", an empty message and a missing one
   gave the fallback line. `callClaude` contains one `sampleFn` call and no `setTimeout` or
   retry.
-- **Not checked:** a real rate-limit error from the `sample` capability (blocked by TD-20),
-  so the service's actual wording is not known.
+- **Not checked:** a real rate-limit error from the `sample` capability, so the service's
+  actual wording is not known. The Oct 14 published test did not try to trigger one.
 - **Main page:** unchanged, `index.html`, 655236 bytes, SHA-256
   `1edc5cca1fbdb8a3462dd647e8711d1ae7634b952915a36abe339a692737d0e2` (as after R2).
 - **Enforced by:** `callClaude` and `rateLimitCopy` in `index.html`.
@@ -110,7 +112,37 @@ checked, and the size and SHA-256 of `index.html` after the change.
    before the request and does not remove it on an error, so it goes out with the next
    request. The fallback line "Your message was not sent" is then only half true, and a
    reader who retypes the message sends it twice. Found while checking TD-08; not in its
-   scope. To be raised as its own tracker item.
+   scope. To be raised as its own tracker item. Seen live on Oct 14 (see Test results):
+   after the first request failed, Thea's reply to "Let's keep going." answered the failed
+   intake.
+3. The first message can fail while the viewer is granting Claude access. In the Oct 14
+   test the first request went out while claude.ai's "Use Claude" prompt was open and, once
+   access was granted, failed with "Claude access isn't confirmed for this artifact right
+   now"; the next message worked. This may be part of TD-20 (Thea fails at first message),
+   though TD-20 reports every message failing on every link and only the first failed
+   here. The error is not one of the codes `sampleErrorCopy` names, so the reader sees the
+   service's text with no hint that sending again works. The error code was not captured.
+4. Replies are shown as plain text, so Markdown from Claude appears literally (Thea's
+   `**bold**` shows its asterisks). Not in any tracker item yet.
+
+## Test results
+
+### Published artifact, Oct 14, 2026 (commit `d08fc58`: R1 to R3)
+
+`index.html` from `d08fc58` was published as a private artifact from Claude Code, with the
+wrapper stripped and capabilities `{"sample": {}, "downloads": true}` as `PUBLISHING.md`
+says, and driven in Chrome by the account that published it.
+
+| Check | Result |
+| --- | --- |
+| TD-10 note under the sign-in notice | Shown as the second line of the consent screen |
+| TD-21: no names in the consent notice | Notice ends at "Check journal policy"; no "Questions?" block |
+| `PUBLISHING.md` check 1: tick, Continue | Intake screen opens scrolled to its top |
+| First message (intake sent to Thea) | claude.ai's "Use Claude" prompt opened during the call; after it was granted the call failed: "Trouble reaching Claude: Claude access isn't confirmed for this artifact right now" (open item 3) |
+| `PUBLISHING.md` check 2: Thea replies | Second message ("Let's keep going.") got a reply in under 10 seconds; it answered the failed intake (open item 2) |
+
+Not tested: Drew, voice, SVG/PNG/PPTX export, PDF or PPTX upload (`PUBLISHING.md` checks
+3 to 6), and a real rate-limit error (R3).
 
 ## History
 
@@ -119,6 +151,7 @@ checked, and the size and SHA-256 of `index.html` after the change.
 | Oct 14, 2026 | R1 | Authors' names and emails removed from the consent notice | TD-21 |
 | Oct 14, 2026 | R2 | Try-another-browser note added under the sign-in notice | TD-10 |
 | Oct 14, 2026 | R3 | Recorded that the rate-limit handling already meets TD-08 (`823b3b1`); no page change | TD-08 |
+| Oct 14, 2026 | — | Published-artifact test of R1 to R3; open items 3 and 4 added | TD-21, TD-10, TD-08 |
 
 ## Considered, not built
 
