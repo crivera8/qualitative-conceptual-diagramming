@@ -2,6 +2,19 @@
 
 Changes to `index.html` (the Figure Creation Agent — Thea & Drew).
 
+## 2026-10-14
+
+The authors' names and emails are removed from the page for the submission (tracker item
+TD-21). The rule, the checks and what was left alone are in `decision-rules-log.md` (R1),
+which starts with this change.
+
+- **Removed the "Questions?" block** at the end of the consent notice: the heading and the
+  line giving both authors' names and emails as `mailto:` links. Nothing replaces it.
+- Nothing else on the page named the authors. The title, meta tags, landing page, example
+  text and embedded figures were checked.
+- Left as they are: `README.md`, `PUBLISHING.md`, older entries in this file, and the git
+  history.
+
 ## 2026-10-05
 
 Seventeen commits: a voice bug that took four wrong theories to pin down, the
