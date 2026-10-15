@@ -4,6 +4,14 @@ Changes to `index.html` (the Figure Creation Agent — Thea & Drew).
 
 ## 2026-10-15
 
+Voice input is removed for now (tracker item TD-19, `decision-rules-log.md` R5).
+
+- **Removed the three microphone buttons** (two on the intake, one beside the chat box),
+  their status lines and the dictation code. It comes back only after transcription quality
+  and token cost are assessed.
+- **Spoken replies stay.** The header toggle's tooltip is now "Toggle voice replies" and its
+  icon a speaker, since it no longer turns on dictation.
+
 When the page cannot reach Claude it now says what the reader can do, and no longer tells
 them to reload (tracker item TD-20, `decision-rules-log.md` R4).
 

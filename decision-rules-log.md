@@ -144,7 +144,39 @@ checked, and the size and SHA-256 of `index.html` after the change.
   messages were not seen live, since access worked.
 - **Main page after this change:** `index.html`, 656267 bytes, SHA-256
   `4aebd26e484406d1a7d64f8eaa6259d108baa7d8d3a18dba164cb647f5ffdfca`.
+- **Web search (checked Oct 15):** no version of `index.html`, from the first commit
+  (`cb1118a`) to this one, has used web search; the first version called the API with
+  plain messages and no search tool. So link users have not had a reduced tool, which
+  answers the tracker's question. None of R1 to R5 touches the Claude call.
 - **Enforced by:** `requestSample`, `noSampleCopy` and `callClaude` in `index.html`.
+
+### R5. No voice input for now; spoken replies stay (TD-19)
+
+- **Rule:** The page offers no dictation. The three microphone buttons (on "How do those
+  things relate to each other?", on "Anything else you'd like me to know?", and beside the
+  chat box) are gone, with their status lines and the dictation code. Spoken replies stay:
+  the header toggle still reads Thea and Drew aloud. Its tooltip is now "Toggle voice
+  replies" (was "Toggle voice replies and dictation") and its icon is a speaker (was a
+  microphone), so it no longer suggests voice input.
+- **Why:** TD-19, confirmed Oct 13 without research-team discussion. Voice input comes back
+  only after its transcription quality is assessed and its token cost is measured with
+  PRI-02.
+- **The change:** removed the three `.mic-btn` buttons, the three dictation status lines,
+  `attachDictation` and its three calls, the `SpeechRecognition` check and the `.mic-btn`
+  CSS; the voice toggle is disabled only when speech synthesis is unavailable. A comment at
+  the voice section says where the dictation code is in the git history. Kept: the
+  `.field-row-mic` layout wrapper (the two text boxes now fill its width) and the
+  `.mic-status` style, which the file-upload status line still uses.
+- **Checks (Oct 15):** headless Chrome with a stand-in for Claude, old page vs new: mic
+  buttons 3 → 0, dictation status lines 3 → 0, the voice toggle switches on and off, the
+  intake (with both text boxes filled) and a follow-up message both reach Thea, and no script
+  or console errors in either. Live, in a private publish declaring `sample`: no microphone
+  on the intake or the chat box, the speaker icon in the header, and Thea answered the first
+  message.
+- **Not checked:** spoken replies with voice switched on in the published page.
+- **Main page after this change:** `index.html`, 651904 bytes, SHA-256
+  `c789f0c115b3cb96f0bee1cc029a3d054ab441ec0b17b5e323817056a7db2e83`.
+- **Enforced by:** page edit only. No effect on prompts to Claude, the diagrams or exports.
 
 ---
 
@@ -199,6 +231,7 @@ Not tested: Drew, voice, SVG/PNG/PPTX export, PDF or PPTX upload (`PUBLISHING.md
 | Oct 14, 2026 | R3 | Recorded that the rate-limit handling already meets TD-08 (`823b3b1`); no page change | TD-08 |
 | Oct 14, 2026 | — | Published-artifact test of R1 to R3; open items 3 and 4 added | TD-21, TD-10, TD-08 |
 | Oct 15, 2026 | R4 | Clear messages when Claude access is missing; access requested again at send | TD-20 |
+| Oct 15, 2026 | R5 | Microphone and dictation removed; voice toggle is replies only, speaker icon | TD-19 |
 
 ## Considered, not built
 
