@@ -15,6 +15,14 @@ which starts with this change.
 - Left as they are: `README.md`, `PUBLISHING.md`, older entries in this file, and the git
   history.
 
+A note on the consent screen now says to try another browser if a PDF won't load
+(tracker item TD-10, `decision-rules-log.md` R2).
+
+- **Added one line** under "You'll need to be signed in to Claude to use this tool.":
+  "If a PDF you attach won't load, try a different browser." The console panel testers saw
+  belongs to the host, not the page, so it cannot be removed; this is the guidance agreed
+  on Oct 3.
+
 ## 2026-10-05
 
 Seventeen commits: a voice bug that took four wrong theories to pin down, the

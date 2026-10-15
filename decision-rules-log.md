@@ -48,6 +48,29 @@ checked, and the size and SHA-256 of `index.html` after the change.
   `936e737`).
 - **Enforced by:** page edit only. No effect on prompts to Claude, the diagrams or exports.
 
+### R2. A note on the consent screen says to try another browser if a PDF won't load (TD-10)
+
+- **Rule:** Directly under the sign-in notice, the consent screen says: "If a PDF you attach
+  won't load, try a different browser." It is a plain paragraph, not a heading, so it sits
+  below the sign-in notice in weight.
+- **Why:** Testers saw a console panel with a PDF.js "fake worker" warning. The panel is the
+  host's or a browser extension's, not the page's, so the page cannot remove it. Decided
+  Oct 3: add guidance instead. The tracker places it beside the sign-in notice (ALL-02) so
+  the "before you start" items sit together.
+- **The change:**
+
+  | # | Where it shows | Before | After |
+  | --- | --- | --- | --- |
+  | 1 | Consent screen, under "You'll need to be signed in to Claude to use this tool." | (nothing) | "If a PDF you attach won't load, try a different browser." |
+
+- **Checks:** one line added and nothing else changed; rendered in headless Chrome, the page
+  loads with no console errors and the note shows as the second line of the consent screen.
+- **Not checked:** whether another browser in fact fixes a failed PDF load. The note is
+  guidance; TD-11 (configuring the PDF.js worker) is the fix for the warning itself.
+- **Main page after this change:** `index.html`, 655236 bytes, SHA-256
+  `1edc5cca1fbdb8a3462dd647e8711d1ae7634b952915a36abe339a692737d0e2`.
+- **Enforced by:** page edit only. No effect on prompts to Claude, the diagrams or exports.
+
 ---
 
 ## Open items
@@ -61,8 +84,11 @@ checked, and the size and SHA-256 of `index.html` after the change.
 | Date | Rule | Change | Tracker |
 | --- | --- | --- | --- |
 | Oct 14, 2026 | R1 | Authors' names and emails removed from the consent notice | TD-21 |
+| Oct 14, 2026 | R2 | Try-another-browser note added under the sign-in notice | TD-10 |
 
 ## Considered, not built
 
 - Replacing the contact line with a generic address. There is no team address, and the
   task asks only for removal.
+- Adding the browser advice to the upload field's "Couldn't read" error as well. That is
+  where a reader meets the problem, but the task places the note on the consent screen.
