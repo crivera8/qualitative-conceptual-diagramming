@@ -184,7 +184,7 @@ checked, and the size and SHA-256 of `index.html` after the change.
   with Drew, or think it through with Thea?" after Drew) is the message box's placeholder,
   not a line of its own above it. The box no longer says "Type a message…". The header is
   slightly tighter, and the send buttons have 12px below them.
-- **Why:** TD-12, "the transcript pane is too short"; Vanessa: "please try to fix that." The
+- **Why:** TD-12, "the transcript pane is too short"; the authors asked for a fix. The
   transcript gets whatever height the header and the message area leave. The box is empty
   after every send, which is when the nudge is wanted, so the line above it was spending
   height on text the box can carry.
