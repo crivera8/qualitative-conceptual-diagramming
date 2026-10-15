@@ -203,7 +203,6 @@
 
   .field-row-mic{ display:flex; gap:8px; align-items:flex-start; }
   .field-row-mic .field-input{ flex:1; resize:vertical; font-family:var(--font-body); }
-  .field-row-mic .mic-btn{ height:38px; margin-top:0; }
 
   .persona-say{
     display:flex; gap:11px; align-items:flex-start; background:var(--white); border:1px solid var(--rule);
@@ -236,13 +235,6 @@
   .voice-toggle svg{ width:13px; height:13px; flex:none; }
   .voice-toggle[aria-pressed="true"]{ background:var(--ink); color:var(--white); border-color:var(--ink); }
   .voice-toggle:disabled{ opacity:0.4; cursor:not-allowed; }
-  .mic-btn{
-    flex:none; width:38px; border:1px solid var(--line); border-radius:var(--radius);
-    background:var(--white); cursor:pointer; display:flex; align-items:center; justify-content:center;
-  }
-  .mic-btn svg{ width:15px; height:15px; }
-  .mic-btn[data-recording="true"]{ background:var(--danger); border-color:var(--danger); }
-  .mic-btn[data-recording="true"] svg{ color:var(--white); }
   .mic-status{ font-size:10.5px; color:var(--ink-faint); padding:3px 2px 0; min-height:14px; margin:0; }
 
   /* ---------- Workspace: single chat ---------- */
@@ -443,11 +435,7 @@
     <label class="field-label" for="intakeRelationships">How do those things relate to each other?<span class="field-hint">Optional — which ones drive which, what's downstream of what, anything you already suspect.</span></label>
     <div class="field-row-mic">
       <textarea id="intakeRelationships" class="field-input" rows="3"></textarea>
-      <button class="mic-btn hidden" id="intakeRelationshipsMic" type="button" title="Dictate">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
-      </button>
     </div>
-    <p class="mic-status" id="intakeRelationshipsMicStatus"></p>
 
     <label class="field-label" for="intakeUnit">What is the unit of analysis?<span class="field-hint">e.g., individual, group, organization.</span></label>
     <input type="text" id="intakeUnit" class="field-input">
@@ -477,11 +465,7 @@
     <label class="field-label" for="intakeExtra">Anything else you'd like me to know?<span class="field-hint">Optional — context, a data excerpt, a hunch, anything.</span></label>
     <div class="field-row-mic">
       <textarea id="intakeExtra" class="field-input" rows="3"></textarea>
-      <button class="mic-btn hidden" id="intakeExtraMic" type="button" title="Dictate">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
-      </button>
     </div>
-    <p class="mic-status" id="intakeExtraMicStatus"></p>
 
     <label class="field-label" for="intakeFileInput">Already have a draft of the figure?<span class="field-hint">Optional — attach a PDF or PowerPoint containing the figure you're drafting, and I'll pull out what readable text I can. It's the figure I need, not the whole paper.</span></label>
     <input type="file" id="intakeFileInput" class="field-input" accept=".pdf,.pptx">
@@ -497,8 +481,8 @@
   <div class="app-header">
     <h1>Figure Creation Agent <span>a thinking and drawing partner for the development of conceptual figures</span></h1>
     <div class="voice-stack">
-      <button class="voice-toggle" id="voiceToggle" aria-pressed="false" title="Toggle voice replies and dictation">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+      <button class="voice-toggle" id="voiceToggle" aria-pressed="false" title="Toggle voice replies">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
         <span id="voiceToggleLabel">Voice off</span>
       </button>
       <p class="voice-debug" id="voiceDebug" hidden></p>
@@ -512,9 +496,6 @@
   <div class="composer-footer">
     <p class="composer-nudge" id="composerNudge">Keep thinking with Thea, or have Drew draw it?</p>
     <div class="composer">
-      <button class="mic-btn hidden" id="micBtn" type="button" title="Dictate">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
-      </button>
       <textarea id="composerInput" placeholder="Type a message…" rows="1"></textarea>
     </div>
     <div class="send-row">
@@ -539,7 +520,6 @@
         Drew draws
       </button>
     </div>
-    <p class="mic-status composer-hint" id="composerMicStatus"></p>
   </div>
 </div>
 
@@ -2781,11 +2761,13 @@ document.getElementById('intakeContinue').addEventListener('click', function(){
 });
 
 /* ============================================================
-   VOICE MODE (speech synthesis + dictation)
+   VOICE MODE (spoken replies)
+   Voice input (dictation) was removed for now (TD-19): it comes back only
+   after its transcription quality and token cost are assessed. The code is
+   in the git history, in attachDictation before the TD-19 commit.
    ============================================================ */
 var voiceEnabled = false;
 var synthAvailable = ('speechSynthesis' in window);
-var RecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
 var currentUtterance = null; // kept in scope deliberately — some browsers drop
                               // speech mid-flight if the utterance is garbage
                               // collected before it finishes
@@ -3037,7 +3019,7 @@ function pollForVoices(){
 
 var voiceBtn = document.getElementById('voiceToggle');
 var voiceLabel = document.getElementById('voiceToggleLabel');
-if(!synthAvailable && !RecognitionCtor){
+if(!synthAvailable){
   voiceBtn.disabled = true;
   voiceBtn.title = "Voice isn't supported in this browser.";
 }
@@ -3053,9 +3035,6 @@ voiceBtn.addEventListener('click', function(e){
   voiceEnabled = !voiceEnabled;
   voiceBtn.setAttribute('aria-pressed', String(voiceEnabled));
   voiceLabel.textContent = voiceEnabled ? 'Voice on' : 'Voice off';
-  var micBtn = document.getElementById('micBtn');
-  var showMic = voiceEnabled && !!RecognitionCtor;
-  micBtn.classList.toggle('hidden', !showMic);
   if(voiceEnabled && synthAvailable){
     // Speak a near-silent utterance directly inside this click handler —
     // a real user gesture — so the browser treats speech synthesis as
@@ -3068,68 +3047,8 @@ voiceBtn.addEventListener('click', function(e){
       pollForVoices();
     } catch(e){ /* best-effort only */ }
   }
-  if(!voiceEnabled){
-    if(synthAvailable) window.speechSynthesis.cancel();
-    document.getElementById('composerMicStatus').textContent = '';
-  }
+  if(!voiceEnabled && synthAvailable) window.speechSynthesis.cancel();
 });
-
-// Wires a mic button to dictation into a target field, with visible error
-// feedback — since we can't grant microphone permission to this page from
-// inside its own JS (that's controlled by whatever embeds it), the most we
-// can do on failure is tell the person clearly instead of failing silently.
-function attachDictation(btnEl, targetEl, statusEl, alwaysShow){
-  if(!RecognitionCtor){
-    btnEl.classList.add('hidden');
-    return;
-  }
-  if(alwaysShow) btnEl.classList.remove('hidden');
-  var rec;
-  try{ rec = new RecognitionCtor(); }
-  catch(e){ btnEl.classList.add('hidden'); return; }
-  rec.continuous = false;
-  rec.interimResults = false;
-  rec.lang = 'en-US';
-  var active = false;
-  function setStatus(msg){ if(statusEl) statusEl.textContent = msg || ''; }
-  rec.onstart = function(){ setStatus('Listening\u2026'); };
-  rec.onresult = function(e){
-    var t = e.results[0][0].transcript;
-    targetEl.value = (targetEl.value ? targetEl.value + ' ' : '') + t;
-    targetEl.dispatchEvent(new Event('input'));
-    setStatus('');
-  };
-  rec.onerror = function(e){
-    active = false;
-    btnEl.setAttribute('data-recording', 'false');
-    var reason = e && e.error;
-    if(reason==='not-allowed' || reason==='service-not-allowed'){
-      setStatus("Microphone access isn't available here \u2014 you can still type.");
-    } else if(reason==='no-speech'){
-      setStatus("Didn't catch that \u2014 try again.");
-    } else {
-      setStatus("Voice input isn't working right now \u2014 you can still type.");
-    }
-  };
-  rec.onend = function(){ active = false; btnEl.setAttribute('data-recording', 'false'); };
-  btnEl.addEventListener('click', function(){
-    if(active){ rec.stop(); return; }
-    if(location.protocol!=='https:' && location.hostname!=='localhost'){
-      setStatus('Voice input needs a secure (https) connection.');
-      return;
-    }
-    setStatus('');
-    try{
-      rec.start();
-      active = true;
-      btnEl.setAttribute('data-recording', 'true');
-    } catch(e){
-      active = false;
-      btnEl.setAttribute('data-recording', 'false');
-      setStatus("Couldn't start listening \u2014 you can still type.");
-    }
-  });
-}
 
 /* ============================================================
    FIGURE DRAFT UPLOAD (PDF / PPTX) -- pulls readable text out of a draft
@@ -3152,8 +3071,8 @@ function attachDictation(btnEl, targetEl, statusEl, alwaysShow){
 
    If either library fails to load, or the file has no extractable text (a
    scanned image of a figure, say), this degrades to a clear message rather
-   than a silent failure. Typing or dictating a description above always
-   works regardless.
+   than a silent failure. Typing a description above always works
+   regardless.
    ============================================================ */
 var JSZIP_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
 var PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs';
@@ -3493,9 +3412,6 @@ function wireExampleCards(){
    INIT
    ============================================================ */
 function init(){
-  attachDictation(document.getElementById('intakeRelationshipsMic'), document.getElementById('intakeRelationships'), document.getElementById('intakeRelationshipsMicStatus'), true);
-  attachDictation(document.getElementById('intakeExtraMic'), document.getElementById('intakeExtra'), document.getElementById('intakeExtraMicStatus'), true);
-  attachDictation(document.getElementById('micBtn'), document.getElementById('composerInput'), document.getElementById('composerMicStatus'), false);
   if(synthAvailable){
     pickVoice('thea');
     pickVoice('drew');
