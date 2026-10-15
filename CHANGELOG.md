@@ -4,6 +4,14 @@ Changes to `index.html` (the Figure Creation Agent — Thea & Drew).
 
 ## 2026-10-15
 
+The transcript is taller (tracker item TD-12, `decision-rules-log.md` R6).
+
+- **The nudge moves into the message box.** "Keep thinking with Thea, or have Drew draw
+  it?" is now the box's placeholder in place of "Type a message…", not a line above it.
+- **Slightly tighter header**, and 12px of space under the send buttons, which TD-19 had
+  left 4px from the edge. Together the transcript gains 38px over the page as it stood this
+  morning (307px instead of 269px in a 463px-high window).
+
 Voice input is removed for now (tracker item TD-19, `decision-rules-log.md` R5).
 
 - **Removed the three microphone buttons** (two on the intake, one beside the chat box),
