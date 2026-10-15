@@ -178,6 +178,34 @@ checked, and the size and SHA-256 of `index.html` after the change.
   `c789f0c115b3cb96f0bee1cc029a3d054ab441ec0b17b5e323817056a7db2e83`.
 - **Enforced by:** page edit only. No effect on prompts to Claude, the diagrams or exports.
 
+### R6. The transcript gets more of the height: the nudge moves into the message box (TD-12)
+
+- **Rule:** The nudge ("Keep thinking with Thea, or have Drew draw it?", or "Keep drawing
+  with Drew, or think it through with Thea?" after Drew) is the message box's placeholder,
+  not a line of its own above it. The box no longer says "Type a message…". The header is
+  slightly tighter, and the send buttons have 12px below them.
+- **Why:** TD-12, "the transcript pane is too short"; the authors asked for a fix. The
+  transcript gets whatever height the header and the message area leave. The box is empty
+  after every send, which is when the nudge is wanted, so the line above it was spending
+  height on text the box can carry.
+- **The change:** removed `.composer-nudge` and its `<p>`; `updateNudge` sets the box's
+  placeholder; header padding 12px → 9px; `.composer` top padding 8px → 10px; `.send-row`
+  padding 8px/4px → 6px/12px. Also removed `.composer-hint`, left unused by R5, and gave the
+  send buttons the bottom space that R5's removed status line used to provide (R5 had left
+  them 4px from the edge).
+- **Measured (headless Chrome, transcript height in px):** window 813: 619 before Oct 15,
+  633 after R5, 657 now; window 613: 419, 433, 457; window 463: 269, 283, 307. The fixed
+  header and message area together went from 194px to 156px.
+- **Checks:** live, in a private publish declaring `sample`: the nudge shows in the box, the
+  intake reaches Thea and she answers the first message; the author approved the look in the
+  published page.
+- **Not checked:** what screen or setup the original complaint came from; the tracker does
+  not say. A bigger gain (about 50px more) would need the Thea and Drew buttons beside the
+  message box, a design change left for the authors.
+- **Main page after this change:** `index.html`, 651806 bytes, SHA-256
+  `bd39e29e5d211310ddda8a1e3b360ae8f711d27e3777025a9affd08f7d540cc4`.
+- **Enforced by:** page layout only. No effect on prompts to Claude, the diagrams or exports.
+
 ---
 
 ## Open items
@@ -232,6 +260,7 @@ Not tested: Drew, voice, SVG/PNG/PPTX export, PDF or PPTX upload (`PUBLISHING.md
 | Oct 14, 2026 | — | Published-artifact test of R1 to R3; open items 3 and 4 added | TD-21, TD-10, TD-08 |
 | Oct 15, 2026 | R4 | Clear messages when Claude access is missing; access requested again at send | TD-20 |
 | Oct 15, 2026 | R5 | Microphone and dictation removed; voice toggle is replies only, speaker icon | TD-19 |
+| Oct 15, 2026 | R6 | Nudge moved into the message box; transcript 38px taller | TD-12 |
 
 ## Considered, not built
 
