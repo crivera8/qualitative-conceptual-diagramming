@@ -2348,18 +2348,33 @@ var isSending = false;
 // api.anthropic.com directly. Instead it asks Claude through a capability
 // the viewer grants when they open the page. That capability has no
 // "system" role, so Thea's and Drew's instructions are folded into a
-// leading user turn on every call instead (see callClaude). Resolved once
-// at load; stays null if this view can't use it (e.g. opened outside
-// Claude, or the viewer declines the very first prompt).
+// leading user turn on every call instead (see callClaude). Requested at
+// load, and requested again at send time while it is still missing.
+// use() resolves null, not an error, when this view cannot use it (not
+// declared at publish, not offered to this viewer, or no viewer answered),
+// and the reasons cannot be told apart from inside the page.
 var sampleFn = null;
-(async function initSample(){
+async function requestSample(){
+  if(sampleFn) return sampleFn;
   try{
-    if(typeof window.claude === 'undefined') return;
-    sampleFn = await window.claude.use('sample');
+    if(typeof window.claude === 'undefined') return null;
+    sampleFn = (await window.claude.use('sample')) || null;
   } catch(e){
     sampleFn = null;
   }
-})();
+  return sampleFn;
+}
+requestSample();
+
+// Shown when there is no Claude access at all. Never says "reload": a
+// reload loses the intake and the conversation (TD-03). The reader's last
+// message stays in the conversation, so it goes out with the next send.
+function noSampleCopy(){
+  if(typeof window.claude === 'undefined'){
+    return "Open this link in a browser where you're signed in to claude.ai.";
+  }
+  return "This page can't reach Claude right now. Check that you're signed in to claude.ai and allowed Claude access when asked, then press Thea thinks or Drew draws again; your last message is kept. If it keeps happening, tell whoever shared this link.";
+}
 
 function pushLog(entry){ chatLog.push(entry); renderChatFeed(); }
 
@@ -2446,7 +2461,10 @@ function sampleErrorCopy(err){
     case 'cancelled':
       return null;
     default:
-      return (err && err.message) ? err.message : 'something went wrong.';
+      // An error the page has no wording for, such as the one seen while
+      // the viewer is still granting Claude access. Sending again works.
+      return ((err && err.message) ? err.message.replace(/\.+$/, '') : 'something went wrong') +
+        '. Press Thea thinks or Drew draws again; your last message is kept.';
   }
 }
 
@@ -2457,8 +2475,9 @@ async function callClaude(persona, userText){
   pushLog({ type:'user', text:userText });
   setSending(persona, true);
 
+  if(!sampleFn) await requestSample();
   if(!sampleFn){
-    pushLog({ type:'error', text:"Thea and Drew talk to Claude through this page's own Claude access, which isn't available right now -- try reloading this artifact." });
+    pushLog({ type:'error', text: noSampleCopy() });
     setSending(persona, false);
     return;
   }
