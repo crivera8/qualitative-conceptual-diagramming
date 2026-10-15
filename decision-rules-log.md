@@ -1,7 +1,7 @@
 # Thea & Drew: decision rules log
 
 **Scope:** `index.html`, the Figure Creation Agent (Thea & Drew).
-**Started:** Oct 14, 2026. **Last updated:** Oct 14, 2026. Rules are numbered in the order
+**Started:** Oct 14, 2026. **Last updated:** Oct 15, 2026. Rules are numbered in the order
 they were decided. Changes made before this log existed are recorded in `CHANGELOG.md` only.
 
 Each rule gives what was decided, why, what changed, how it was checked, what was not
@@ -101,6 +101,51 @@ checked, and the size and SHA-256 of `index.html` after the change.
   `1edc5cca1fbdb8a3462dd647e8711d1ae7634b952915a36abe339a692737d0e2` (as after R2).
 - **Enforced by:** `callClaude` and `rateLimitCopy` in `index.html`.
 
+### R4. When the page cannot reach Claude, it says what the reader can do, and never "reload" (TD-20)
+
+- **Rule:** If `window.claude` is missing, the page says "Open this link in a browser where
+  you're signed in to claude.ai." If Claude access is missing, it asks for it again at send
+  time, and if it is still missing says: "This page can't reach Claude right now. Check that
+  you're signed in to claude.ai and allowed Claude access when asked, then press Thea thinks
+  or Drew draws again; your last message is kept. If it keeps happening, tell whoever shared
+  this link." An error the page has no wording for keeps the service's text and adds "Press
+  Thea thinks or Drew draws again; your last message is kept." No message says "reload",
+  which loses the intake and the conversation (TD-03).
+- **Why:** TD-20. Every send on the public link showed one catch-all line ending "try
+  reloading this artifact". The page asked for Claude access once at load; when that came
+  back empty, nothing asked again and nothing told the reader what to do.
+- **What the page cannot do:** `use('sample')` returns nothing, not an error, when access is
+  unavailable, and the reasons (not declared at publish, not offered to this viewer, no
+  answer to the prompt) cannot be told apart inside the page. So the tracker's idea of
+  keeping the setup error and showing its mapped message is not possible.
+- **Diagnosis, Oct 15:** the repo's `index.html` has used `sample` since `18b6391`
+  (Sep 29), as has the `vanecon` repo, so there is one build, not two. The tracker's Oct 8
+  note that the repo page calls the API directly is out of date. The public Thea & Drew
+  link (published Oct 3) uses the same `sample` code. Opened from this account it failed on
+  both messages sent, with no "Use Claude" prompt at all, while our private publish, which
+  declares `sample`, showed the prompt and worked. With the tracker's report that the link
+  fails for its creator too, this points to that publish not declaring Claude access. The
+  Claude Code–published link the outside testers used could not be opened from this
+  account.
+- **Recommended:** republish the public link from the repo's `index.html` as
+  `PUBLISHING.md` says, declaring `{"sample": {}, "downloads": true}`. Only the link's owner
+  can do this; no change to the page fixes a publish that leaves it out.
+- **The change:** `requestSample()` replaces the load-time-only request and is called again
+  in `callClaude` when access is missing; `noSampleCopy()` gives the two messages above;
+  `sampleErrorCopy`'s default branch adds the retry line.
+- **Checks (Oct 15, headless Chrome with a stand-in for `window.claude`, old page vs new):**
+  no `window.claude`: catch-all → the "open this link" line; access empty: catch-all → the
+  "can't reach Claude" message; access empty at load but present at send: failed every send
+  → Thea replied on the first; an unrecognised error: service text alone → service text plus
+  the retry line; normal reply: unchanged. Live, in a private publish declaring `sample`:
+  the first message got a reply with no error (access had been granted the day before).
+- **Not checked:** whether asking again at send time helps in the real runtime, which may
+  return the same empty answer it gave at load; the stand-in returned a new one. The new
+  messages were not seen live, since access worked.
+- **Main page after this change:** `index.html`, 656267 bytes, SHA-256
+  `4aebd26e484406d1a7d64f8eaa6259d108baa7d8d3a18dba164cb647f5ffdfca`.
+- **Enforced by:** `requestSample`, `noSampleCopy` and `callClaude` in `index.html`.
+
 ---
 
 ## Open items
@@ -122,6 +167,7 @@ checked, and the size and SHA-256 of `index.html` after the change.
    though TD-20 reports every message failing on every link and only the first failed
    here. The error is not one of the codes `sampleErrorCopy` names, so the reader sees the
    service's text with no hint that sending again works. The error code was not captured.
+   R4 adds the retry hint (Oct 15).
 4. Replies are shown as plain text, so Markdown from Claude appears literally (Thea's
    `**bold**` shows its asterisks). Not in any tracker item yet.
 
@@ -152,6 +198,7 @@ Not tested: Drew, voice, SVG/PNG/PPTX export, PDF or PPTX upload (`PUBLISHING.md
 | Oct 14, 2026 | R2 | Try-another-browser note added under the sign-in notice | TD-10 |
 | Oct 14, 2026 | R3 | Recorded that the rate-limit handling already meets TD-08 (`823b3b1`); no page change | TD-08 |
 | Oct 14, 2026 | — | Published-artifact test of R1 to R3; open items 3 and 4 added | TD-21, TD-10, TD-08 |
+| Oct 15, 2026 | R4 | Clear messages when Claude access is missing; access requested again at send | TD-20 |
 
 ## Considered, not built
 

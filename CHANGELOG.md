@@ -2,6 +2,23 @@
 
 Changes to `index.html` (the Figure Creation Agent — Thea & Drew).
 
+## 2026-10-15
+
+When the page cannot reach Claude it now says what the reader can do, and no longer tells
+them to reload (tracker item TD-20, `decision-rules-log.md` R4).
+
+- **Claude access is asked for again at send time** when the request at load came back
+  empty, through a new `requestSample()`.
+- **Two messages replace the catch-all.** With no `window.claude`: "Open this link in a
+  browser where you're signed in to claude.ai." With no Claude access: "This page can't
+  reach Claude right now. Check that you're signed in to claude.ai and allowed Claude access
+  when asked, then press Thea thinks or Drew draws again; your last message is kept. If it
+  keeps happening, tell whoever shared this link."
+- **Errors the page has no wording for** keep the service's text and add "Press Thea thinks
+  or Drew draws again; your last message is kept."
+- The public link's failure is most likely a publish that does not declare Claude access;
+  see R4. That needs a republish, not a page change.
+
 ## 2026-10-14
 
 The authors' names and emails are removed from the page for the submission (tracker item
