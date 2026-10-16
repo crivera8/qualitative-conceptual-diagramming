@@ -1,7 +1,7 @@
 # Thea & Drew: decision rules log
 
 **Scope:** `index.html`, the Figure Creation Agent (Thea & Drew).
-**Started:** Oct 14, 2026. **Last updated:** Oct 15, 2026. Rules are numbered in the order
+**Started:** Oct 14, 2026. **Last updated:** Oct 16, 2026. Rules are numbered in the order
 they were decided. Changes made before this log existed are recorded in `CHANGELOG.md` only.
 
 Each rule gives what was decided, why, what changed, how it was checked, what was not
@@ -71,6 +71,12 @@ checked, and the size and SHA-256 of `index.html` after the change.
   guidance; TD-11 (configuring the PDF.js worker) is the fix for the warning itself.
 - **Main page after this change:** `index.html`, 655236 bytes, SHA-256
   `1edc5cca1fbdb8a3462dd647e8711d1ae7634b952915a36abe339a692737d0e2`.
+- **Addition (Oct 16):** at a team member's request the same sentence also ends the hint
+  under "Already have a draft of the figure?" on the intake screen, where the reader attaches
+  the PDF: "…It's the figure I need, not the whole paper. If a PDF won't load, try a
+  different browser." Checked in headless Chrome (no console errors; the hint shows the
+  sentence). Published to the private test artifact but not viewed there. `index.html` after: 651852 bytes, SHA-256
+  `7a99bffac8fca53c6328686b440279770b7b2951820bab20f6e148ef2e8957d7`.
 - **Enforced by:** page edit only. No effect on prompts to Claude, the diagrams or exports.
 
 ### R3. A rate limit gets one request and the service's own wording, no auto-retry (TD-08)
@@ -261,6 +267,7 @@ Not tested: Drew, voice, SVG/PNG/PPTX export, PDF or PPTX upload (`PUBLISHING.md
 | Oct 15, 2026 | R4 | Clear messages when Claude access is missing; access requested again at send | TD-20 |
 | Oct 15, 2026 | R5 | Microphone and dictation removed; voice toggle is replies only, speaker icon | TD-19 |
 | Oct 15, 2026 | R6 | Nudge moved into the message box; transcript 38px taller | TD-12 |
+| Oct 16, 2026 | R2 | Browser note also added to the upload field's hint | TD-10 |
 
 ## Considered, not built
 
