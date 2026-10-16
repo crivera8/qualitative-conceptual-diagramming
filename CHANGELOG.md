@@ -2,6 +2,15 @@
 
 Changes to `index.html` (the Figure Creation Agent — Thea & Drew).
 
+## 2026-10-16
+
+The try-another-browser note now also appears where the PDF is attached (tracker item TD-10,
+`decision-rules-log.md` R2, addition of Oct 16).
+
+- **Added one sentence** to the end of the hint under "Already have a draft of the figure?":
+  "If a PDF won't load, try a different browser." The note under the sign-in line on the
+  consent screen stays.
+
 ## 2026-10-15
 
 The transcript is taller (tracker item TD-12, `decision-rules-log.md` R6).
