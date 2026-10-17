@@ -65,17 +65,22 @@ The published artifact is this file with its document wrapper removed — the ar
 
 **Figure upload.** `wireFigureUpload`, `extractTextFromPdf`, `extractTextFromPptx`.
 
-## Figure licences — three different positions
+## Figure licences — these are not one position
 
-The schematics on the example cards are our own drawings, because re-hosting a published figure depends on that figure's licence even when the paper is open access. The three examples are **not** in the same position, and must not be collapsed into one statement:
+Two cards now carry the published figure itself; each sits on a different permission, and they must not be collapsed into one statement. Re-hosting a published figure depends on that figure's licence even when the paper is open access.
 
 | Example | Status | What's allowed |
 |---|---|---|
-| Sayegh (process) | **Confirmed CC BY 4.0** | Reproduced in the card, with attribution. |
-| Shen (variance) | **Confirmed CC BY** — checked 2026-10-02 against the article PDF's own copyright statement | Could be reproduced with attribution. Deliberately not embedded; that is a content decision. |
-| Tilcsik (sequential) | **Not open access** (AMJ, 2010) | Cite and link only. Never reproduce. |
+| Sayegh (**variance**) | **Confirmed CC BY 4.0** | Reproduced on the card with attribution. Unconditional beyond attribution. |
+| Lee & Young-Hyman (**process**) | **CC BY-NC 4.0** on the version of record, per the publisher's CrossRef deposit (checked 2026-10-05) | Reproduced on the card with attribution — **conditional on non-commercial distribution**. See below. |
+| Shen (not shown) | **Confirmed CC BY** — checked 2026-10-02 against the article PDF's own copyright statement | Could be reproduced with attribution. Not currently on any card; it was the variance example before Sayegh took that slot. |
+| Tilcsik (not shown) | **Not open access** (AMJ, 2010) | Cite and link only. Never reproduce. Sequential has no chip, so it isn't displayed. |
 
-`visual.kind` is per-example for exactly this reason. `renderExampleVisual` already handles `kind: 'reproduction'`, so swapping a real figure in is a data change here, not a refactor.
+**The NonCommercial condition is the one to watch.** Lee & Young-Hyman's figure is embedded *because* this tool is distributed free, as a research companion. That is a standing condition on distribution, not a one-time clearance: if the tool is ever sold, bundled into something sold, or used to promote a commercial offering, that figure has to come out. Sayegh's would not.
+
+Two further notes on it. The article PDF prints **no** licence — page 1 carries only SAGE's standard "Article reuse guidelines" line, which on its own reads as all-rights-reserved — so the PDF cannot be used to clear this and the CrossRef record is what the permission rests on. And the figure's two upside-down "supports" labels are set that way in the published original; the page render is a rigid rotation, so they are not a rendering error.
+
+`visual.kind` is per-example for exactly this reason. `renderExampleVisual` handles `kind: 'reproduction'`, so swapping a real figure in is a data change in `MODEL_EXAMPLES`, not a refactor.
 
 ## Editing notes
 
@@ -85,7 +90,9 @@ The schematics on the example cards are our own drawings, because re-hosting a p
 
 **Keep the two export formats in step.** The PPTX path has repeatedly been the one that silently lost a feature the SVG path gained.
 
-**Re-encoding the embedded figure.** The source PNG is at `figures/sayegh-2025-figure1.png`, cropped from page 13 of the article PDF at 300dpi and reduced to a 128-colour palette (2000×896, 180KB — a full-colour PNG of the same crop was 494KB for no visible gain on line art).
+**Re-encoding an embedded figure.** Both source PNGs are in `figures/`, rendered from their article PDFs at 300dpi and reduced to a 128-colour palette — `sayegh-2025-figure1.png` (page 13, 2000×896, 180KB) and `lee-younghyman-2026-figure1.png` (page 32, 2531×1621, 180KB; the page is printed rotated 90°, so it is rotated back as a whole).
+
+Two things that are easy to get backwards here. Full colour is not worth it on line art — a full-colour Sayegh crop was 494KB for no visible gain. And **downscaling can make the file bigger**: the Lee figure at 1800px wide encoded to 228KB against 180KB at its native 2531px, because resampling smears antialiasing across flat fills that otherwise compress cleanly. Measure before resizing rather than assuming smaller pixels mean smaller bytes.
 
 ## Known rough edges
 

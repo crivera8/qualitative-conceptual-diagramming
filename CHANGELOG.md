@@ -2,6 +2,216 @@
 
 Changes to `index.html` (the Figure Creation Agent — Thea & Drew).
 
+## 2026-10-16
+
+The try-another-browser note now also appears where the PDF is attached (tracker item TD-10,
+`decision-rules-log.md` R2, addition of Oct 16).
+
+- **Added one sentence** to the end of the hint under "Already have a draft of the figure?":
+  "If a PDF won't load, try a different browser." The note under the sign-in line on the
+  consent screen stays.
+
+## 2026-10-15
+
+The transcript is taller (tracker item TD-12, `decision-rules-log.md` R6).
+
+- **The nudge moves into the message box.** "Keep thinking with Thea, or have Drew draw
+  it?" is now the box's placeholder in place of "Type a message…", not a line above it.
+- **Slightly tighter header**, and 12px of space under the send buttons, which TD-19 had
+  left 4px from the edge. Together the transcript gains 38px over the page as it stood this
+  morning (307px instead of 269px in a 463px-high window).
+
+Voice input is removed for now (tracker item TD-19, `decision-rules-log.md` R5).
+
+- **Removed the three microphone buttons** (two on the intake, one beside the chat box),
+  their status lines and the dictation code. It comes back only after transcription quality
+  and token cost are assessed.
+- **Spoken replies stay.** The header toggle's tooltip is now "Toggle voice replies" and its
+  icon a speaker, since it no longer turns on dictation.
+
+When the page cannot reach Claude it now says what the reader can do, and no longer tells
+them to reload (tracker item TD-20, `decision-rules-log.md` R4).
+
+- **Claude access is asked for again at send time** when the request at load came back
+  empty, through a new `requestSample()`.
+- **Two messages replace the catch-all.** With no `window.claude`: "Open this link in a
+  browser where you're signed in to claude.ai." With no Claude access: "This page can't
+  reach Claude right now. Check that you're signed in to claude.ai and allowed Claude access
+  when asked, then press Thea thinks or Drew draws again; your last message is kept. If it
+  keeps happening, tell whoever shared this link."
+- **Errors the page has no wording for** keep the service's text and add "Press Thea thinks
+  or Drew draws again; your last message is kept."
+- The public link's failure is most likely a publish that does not declare Claude access;
+  see R4. That needs a republish, not a page change.
+
+## 2026-10-14
+
+The authors' names and emails are removed from the page for the submission (tracker item
+TD-21). The rule, the checks and what was left alone are in `decision-rules-log.md` (R1),
+which starts with this change.
+
+- **Removed the "Questions?" block** at the end of the consent notice: the heading and the
+  line giving both authors' names and emails as `mailto:` links. Nothing replaces it.
+- Nothing else on the page named the authors. The title, meta tags, landing page, example
+  text and embedded figures were checked.
+- Left as they are: `README.md`, `PUBLISHING.md`, older entries in this file, and the git
+  history.
+
+A note on the consent screen now says to try another browser if a PDF won't load
+(tracker item TD-10, `decision-rules-log.md` R2).
+
+- **Added one line** under "You'll need to be signed in to Claude to use this tool.":
+  "If a PDF you attach won't load, try a different browser." The console panel testers saw
+  belongs to the host, not the page, so it cannot be removed; this is the guidance agreed
+  on Oct 3.
+
+## 2026-10-05
+
+Seventeen commits: a voice bug that took four wrong theories to pin down, the
+example cards reassigned across the three model types, and some copy.
+
+### The voice bug
+
+Thea was meant to read in a female-sounding voice and Drew in a male one.
+Drew kept sounding like Samantha. Four explanations were tried and three of
+them were wrong, which is worth recording so they are not tried again:
+
+- *"The sandbox exposes no voice list."* Wrong. A readout added to measure
+  it reported **199** voices, and resolved Drew to Daniel [en-GB]
+  (`eeab159`). The list is simply populated **late** — 0 voices early, 199
+  a moment later in the same frame. `voiceschanged` alone did not surface
+  them; a poll did, and it now starts at page load rather than when voice
+  mode is switched on, so a first reply no longer speaks with the
+  pitch-only fallback exactly once.
+- *A `#debug` hash would show the readout* (`81591d5`). It can never fire:
+  the artifact iframe's `src` carries a query string and no fragment, so no
+  hash ever reaches the page. Replaced with a key chord.
+- *Ctrl+Alt+D as `e.key === 'd'`* (`5c8fe8f`). On macOS, Option rewrites
+  `e.key` to `'∂'`. Matched on `e.code === 'KeyD'` instead, and added
+  Shift-click on the Voice button, since a chord also needs focus inside
+  the iframe.
+
+The actual cause was three separate things, all present, all fixed together
+in `d1fc4e5` rather than guessing which one mattered:
+
+1. **A stale voice object.** The chosen `SpeechSynthesisVoice` was cached
+   as an object from an earlier `getVoices()` call. When the engine
+   repopulates its list, a handle from the previous list is silently
+   ignored. The cache now holds the voice **name** and re-resolves the live
+   object immediately before each utterance.
+2. **An unconditional `cancel()`.** `speak()` called
+   `speechSynthesis.cancel()` before every utterance, including when
+   nothing was speaking — which makes some engines drop the voice on the
+   new utterance and fall back to the default. It now cancels only when
+   speaking or pending.
+3. **`lang` set alongside `voice`.** Setting `utterance.lang` next to
+   `utterance.voice` makes some engines re-select by locale and discard the
+   assigned voice. The voice already carries its locale, so `lang` is set
+   only in the no-voice fallback, where it is the only steer available.
+
+Pitch was also pushed apart so the two stay distinguishable where only one
+voice is installed: Drew's fallback to 0.1 (`02fa367`, `17aeef3`) and
+Thea's raised (`0dba26d`).
+
+### Example cards reassigned
+
+- **Two model-type options reworded** (`cc83559`). Process-based is now
+  "things unfold or lead to each other, without a focus on variance across
+  units of analysis"; Sequential is "a series of stages that unfolds across
+  time, though the exact steps may differ slightly across actors".
+- **The examples moved** (`cc83559`). Sayegh went from the process card to
+  the **variance** card, bringing its embedded Figure 1 with it — still
+  permitted, since CC BY does not care which card it sits on. Lee &
+  Young-Hyman (2026) became the process example. **Sequential lost its chip
+  entirely:** there is no published example for it, and Tilcsik is not open
+  access. Its entry is kept rather than deleted, because the schematic and
+  claim line are still wanted; only the missing example is the reason the
+  card is not shown.
+- **One note per figure, not two** (`1956ea3`). The variance card described
+  the same figure twice — a caption under the image and a citation line
+  below it. The caption went. The **licence did not**: CC BY requires
+  attribution naming the licence, and the caption was the only place it
+  appeared, so the citation line now carries it. `figureBlockHTML` renders
+  a `figcaption` only when there is credit text for it, so a future figure
+  that needs its own caption still gets one.
+- **Lee & Young-Hyman's actual Figure 1 embedded** (`aa5c02e`), replacing
+  "cited and linked only". See the licence section below — this one is not
+  on the same footing as Sayegh's.
+- **The process card reduced to that figure alone.** Its schematic (Trigger
+  → Mechanism → Outcome A/B) and its claim line both went. The published
+  figure already shows the branching-over-time signature the schematic was
+  there to teach, and shows it on real constructs rather than on
+  placeholders, so the drawing was making the same point twice and less
+  well. Switched to `kind:'reproduction'`, which already existed for exactly
+  this — the figure becomes the card's visual rather than sitting beneath a
+  schematic — so it was a data change plus making `claim` optional in
+  `exampleCardHTML`. **The process card is now the only one with no drawing
+  and no claim line**; the note beside `MODEL_EXAMPLES` about each type
+  having a visual signature still applies, but for process that signature
+  has to be read off the real figure.
+
+  This also retires, for good, the deliberate description/drawing
+  contradiction recorded under 2026-10-02 below: the option was reworded in
+  `cc83559` and there is now no drawing to disagree with it. The note in
+  `PUBLISHING.md` that warned Vanessa about it had gone stale on both
+  counts and has been rewritten.
+
+### Intake
+
+- **A unit-of-analysis field** on the intake screen: "What is the unit of
+  analysis?", with "e.g., individual, group, organization" as the hint, and
+  a plain text box. It sits between "How do those things relate to each
+  other?" and "What sort of model do you think this is?".
+
+  In the summary sent to Thea it is placed immediately **before** the model
+  line rather than appended with the other optional fields, because the
+  Process-based option is defined as "without a focus on variance across
+  units of analysis" — Thea has to read the two together to say anything
+  useful about which model type fits. It also appears in the one-line
+  receipt in the feed. Optional, like the other free-text fields: when it is
+  left blank both the summary line and the receipt segment drop out
+  entirely.
+
+### Copy
+
+- **A sign-in notice on the consent screen** (`4ee0d42`), cut to a single
+  sentence (`ba5798d`): "You'll need to be signed in to Claude to use this
+  tool." It sits before "Where your words go".
+- **The intake lede's opening sentence** (`5a1c8d9`) now reads "This AI tool
+  is designed to help management researchers with qualitative data develop
+  figures for their research."
+
+### Licences — a fourth state, and the first conditional one
+
+The licence notes beside `MODEL_EXAMPLES` now record four papers in four
+states, including the two no longer displayed. The one that changes how
+this repo has to be handled from here on:
+
+**Lee & Young-Hyman is CC BY-NC 4.0**, and its Figure 1 is embedded. That
+is not the same permission as Sayegh's CC BY. NonCommercial makes the embed
+**conditional on how this tool is distributed** — it is permitted because
+the tool is given away free as a research companion. If it is ever sold,
+bundled into something sold, or used to promote a commercial offering, that
+figure has to come out; Sayegh's would not. Nothing in the page enforces
+this, so it travels in the licence comment and in `README.md`.
+
+Two things that make this easy to get wrong. The licence is **not printed
+in the article PDF at all** — page 1 carries only SAGE's standard "Article
+reuse guidelines" line, which on its own reads as all-rights-reserved — so
+the permission rests on the publisher's own CrossRef deposit for the version
+of record, checked 2026-10-05. And the figure's two upside-down "supports"
+labels are set that way in the published original: the page is printed
+rotated 90° and is rotated back as a whole, so every label keeps its
+original orientation.
+
+On encoding it: 300dpi from page 32, kept at its native 2531×1621 and
+reduced to a 128-colour palette, 180KB. **Downscaling first made the file
+larger** — 1800px wide came out at 228KB — because resampling smears
+antialiasing across flat line art that otherwise compresses cleanly. Worth
+remembering before resizing the next one.
+
+---
+
 ## 2026-10-02
 
 Sixteen commits. Grouped by what they touch rather than by commit order.
